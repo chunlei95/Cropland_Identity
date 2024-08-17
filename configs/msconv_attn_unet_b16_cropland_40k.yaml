@@ -1,0 +1,41 @@
+_base_: './_base_/dataset/cropland.yaml'
+
+batch_size: 8
+iters: 40000
+
+model:
+  type: ConvAttnUNet
+  in_channels: 3
+  num_classes: 2
+  num_stages: 4
+  patch_size: 3
+  merge_size: 3
+  encode_size: 3
+  stage_out_channels: [ 96, 192, 384, 768 ]
+  depths: [ 2, 2, 2, 1 ]
+  local_kernel_sizes: [ 3, 3, 3, 3 ]
+  attn_kernel_sizes: [ [ 7, 9, 11 ],
+                       [ 7, 9, 11 ],
+                       [ 7, 9, 11 ],
+                       [ 7, 9, 11 ] ]
+  dilations: [ [ 3, 3, 3 ],
+               [ 3, 3, 3 ],
+               [ 3, 3, 3 ],
+               [ 3, 3, 3 ] ]
+  drop_rate: 0.5
+  conv_attn_num: 1
+  norm_type: nn.LayerNorm
+  act_type: nn.GELU
+
+optimizer:
+  _inherited_: False
+  type: AdamW
+  weight_decay: 0.01
+
+lr_scheduler:
+  type: PolynomialDecay
+  warmup_iters: 1500
+  warmup_start_lr: 1.0e-6
+  learning_rate: 0.0001
+  end_lr: 0.0
+  power: 1.0

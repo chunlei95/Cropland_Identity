@@ -1,0 +1,71 @@
+batch_size: 16
+iters: 40000
+
+train_dataset:
+  type: CroplandDataset
+  dataset_root: D:/datasets/Cropland_Small
+  img_dir: img_dir/train
+  ann_dir: ann_dir/train
+#  augment_train: True
+#  augment_times: 5
+#  augment_transforms:
+#    - type: RandomRotation
+#    - type: ResizeStepScaling
+#      min_scale_factor: 0.5
+#      max_scale_factor: 2.0
+#      scale_step_size: 0.25
+#    - type: RandomPaddingCrop
+#      crop_size: [ 512, 512 ]
+#    - type: RandomHorizontalFlip
+#    - type: RandomVerticalFlip
+#    - type: RandomDistort
+#      brightness_range: 0.4
+#      contrast_range: 0.4
+#      saturation_range: 0.4
+#    - type: RandomBlur
+#    - type: RandomNoise
+  transforms:
+    - type: ResizeStepScaling
+      min_scale_factor: 0.5
+      max_scale_factor: 2.0
+      scale_step_size: 0.25
+    - type: RandomPaddingCrop
+      crop_size: [256, 256]
+    - type: RandomHorizontalFlip
+    - type: RandomDistort
+      brightness_range: 0.4
+      contrast_range: 0.4
+      saturation_range: 0.4
+    - type: Normalize
+  mode: train
+
+val_dataset:
+  type: CroplandDataset
+  dataset_root: D:/datasets/Cropland_Small
+  img_dir: img_dir/val
+  ann_dir: ann_dir/val
+  transforms:
+    - type: Normalize
+  mode: val
+
+
+optimizer:
+  type: AdamW
+  weight_decay: 0.01
+
+lr_scheduler:
+  type: PolynomialDecay
+  warmup_iters: 1500
+  warmup_start_lr: 1.0e-6
+  learning_rate: 0.00006
+  end_lr: 0.0
+  power: 0.9
+
+loss:
+  types:
+    - type: MixedLoss
+      losses:
+        - type: CrossEntropyLoss
+        - type: DiceLoss
+      coef: [1, 1]
+  coef: [1]
