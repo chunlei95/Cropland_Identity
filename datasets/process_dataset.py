@@ -30,6 +30,31 @@ def split_image(img_path, save_path):
             cv2.imwrite(str(img_save_path), sub_arr)
 
 
+def extract_area_and_label(img_save_path, ann_save_path, img_path, ann_path, crop_size=[256, 256], pixel_interval=128):
+    img_paths = glob(img_path + '/*')
+    for i in range(len(img_paths)):
+        img_path = img_paths[i]
+        img_name, img_ext = os.path.splitext(os.path.split(img_path)[-1])
+        ann_path = os.path.join(ann_path, img_name + '.png')
+        if not os.path.exists(ann_path):
+            raise FileNotFoundError('annotation file not found: ' + str(ann_path))
+        img_arr = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        ann_arr = cv2.imread(str(ann_path), cv2.IMREAD_GRAYSCALE)
+        im_h, im_w = img_arr.shape[0:-1]
+        num_h, num_w = int(im_h / pixel_interval), int(im_w / pixel_interval)
+        for i in range(num_h):
+            for j in range(num_w):
+                sub_num = i * (num_w) + j + 1
+                img_save_path = os.path.join(img_save_path, img_name + '_' + str(sub_num) + img_ext)
+                ann_save_path = os.path.join(ann_save_path, img_name + '_' + str(sub_num) + '.png')
+                sub_img = img_arr[i * pixel_interval: i * pixel_interval + crop_size[0],
+                          j * pixel_interval: j * pixel_interval + crop_size[1], :]
+                sub_ann = ann_arr[i * pixel_interval: i * pixel_interval + crop_size[0],
+                          j * pixel_interval: j * pixel_interval + crop_size[0], :]
+                cv2.imwrite(str(img_save_path), sub_img)
+                cv2.imwrite(str(ann_save_path), sub_ann)
+
+
 def split_dataset(root_path, test_ratio, labeled_ratio=1.0 / 16):
     imgs = glob(root_path + '/*')
     counts = len(imgs)
@@ -79,18 +104,24 @@ if __name__ == '__main__':
     # img_path = r'D:/datasets/Cropland_Identity/cropland_identity_datasource/Cropland_Identity/region6'
     # split_image(img_path, 'D:/datasets/cropland_identity/Cropland_Identity')
     # split_dataset(img_path, 0.2, 1.0 / 16)
-    parser = argparse.ArgumentParser()
-    parser.add_argument("json_file")
-    parser.add_argument("-o", "--out", default=None)
-    args = parser.parse_args()
-    file_path = args.json_file
-    json_paths = glob(file_path + '/*')
-    for path in json_paths:
-        main(path, args)
-    json_label_path = 'D:/datasets/Cropland_Identity/label_json/train_labeled'
-    save_label_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/ann_dir/train_labeled'
-    extract_label(json_label_path, save_label_path)
-    label_map(save_label_path)
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("json_file")
+    # parser.add_argument("-o", "--out", default=None)
+    # args = parser.parse_args()
+    # file_path = args.json_file
+    # json_paths = glob(file_path + '/*')
+    # for path in json_paths:
+    #     main(path, args)
+    # json_label_path = 'D:/datasets/Cropland_Identity/label_json/train_labeled'
+    # save_label_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/ann_dir/train_labeled'
+    # extract_label(json_label_path, save_label_path)
+    # label_map(save_label_path)
     # img_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/ann_dir/train_labeled/region1_67.png'
     # img_arr = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
     # print(img_arr.max())
+
+    img_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/img_dir/train_labeled'
+    ann_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/ann_dir/train_labeled'
+    img_save_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/img_dir/train_labeled'
+    ann_save_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/ann_dir/train_labeled'
+    extract_area_and_label(img_save_path, ann_save_path, img_path, ann_path)

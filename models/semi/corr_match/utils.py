@@ -1,4 +1,6 @@
 import paddle
+import paddle.nn as nn
+import paddle.nn.functional as F
 
 
 class ThreshController:
@@ -47,18 +49,47 @@ class ThreshController:
         return self.thresh_global
 
 
-def corr_compute_loss(dict_result: dict, u_s_results: dict, b_l, b_u_l):
+def corr_compute_loss(dict_result: dict,
+                      u_s_results: dict,
+                      label,
+                      loss_fn,
+                      edges,
+                      losses,
+                      b_l,
+                      b_u_l,
+                      num_classes,
+                      thresh_init):
+    thresh_controller = ThreshController(nclass=num_classes, momentum=0.999, thresh_init=thresh_init)
     predicts = dict_result['out']
     predicts_corr = dict_result['corr_out']
-    predicts_corr_map = dict_result['corr_map'].detach()
+
     l_pred, u_w_pred = paddle.split(predicts, [b_l, b_u_l])
     l_x_corr, u_w_corr = paddle.split(predicts_corr, [b_l, b_u_l])
-    u_w_corr_map = predicts_corr_map[b_l:]
     u_s_pred = u_s_results['out']
     u_s_corr = u_s_results['corr_out']
 
     u_w_pred = u_w_pred.detach()
     conf_u_w = u_w_pred.detach().softmax(axis=1).max(axis=1)[0]
-    mask_u_w = u_w_pred.detach().argmax(axis=1)
+    label_u = u_w_pred.detach().argmax(axis=1)
 
-    pass
+    thresh_controller.thresh_update(u_w_pred.detach(), update_g=True)
+    thresh_global = thresh_controller.get_thresh_global()
+    mask_indicator = (conf_u_w > thresh_global)
+
+    loss_s = loss_fn(l_pred, label, edges, losses)
+    loss_s_c = loss_fn(l_x_corr, label, edges, losses)
+
+    softmax_pred_u_w = F.softmax(u_w_pred.detach(), axis=1)
+    logsoftmax_pred_u_s1 = F.log_softmax(u_s_pred, axis=1)
+    loss_u_s = nn.KLDivLoss()(logsoftmax_pred_u_s1, softmax_pred_u_w) * mask_indicator
+
+    l_u_w = loss_fn(u_w_pred, label_u, edges, losses) * mask_indicator
+    l_u_s = loss_fn(u_s_pred, label_u, edges, losses) * mask_indicator
+    loss_u = (sum(l_u_w) + sum(l_u_s)) * 0.5
+
+    loss_u_w_c = loss_fn(u_w_corr, label_u, edges, losses) * mask_indicator
+    loss_u_s_c = loss_fn(u_s_corr, label_u, edges, losses) * mask_indicator
+    loss_u_c = (loss_u_w_c + loss_u_s_c) * 0.5
+
+    loss = (sum(loss_s) + sum(loss_s_c)) * 0.5 + (loss_u * 0.5 + loss_u_s * 0.25 + loss_u_c * 0.25)
+    return loss

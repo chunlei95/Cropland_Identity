@@ -7,7 +7,7 @@ import paddle
 from paddleseg.core import infer
 from paddleseg.utils import (TimeAverager, calculate_eta, resume, logger,
                              worker_init_fn, train_profiler, op_flops_funs)
-
+from models.semi.corr_match.utils import corr_compute_loss
 from core.val import evaluate
 
 
@@ -42,6 +42,7 @@ def loss_computation(logits_list, labels, edges, losses):
     return loss_list
 
 
+# noinspection PyUnboundLocalVariable,PyTypeChecker
 def train_semi(model,
                train_dataset,
                unlabeled_train_dataset,
@@ -57,7 +58,6 @@ def train_semi(model,
                num_workers=0,
                use_vdl=False,
                losses=None,
-               kl_loss=None,
                keep_checkpoint_max=5,
                test_config=None,
                precision='fp32',
@@ -196,8 +196,20 @@ def train_semi(model,
                             "elementwise_add", "batch_norm", "sync_batch_norm"
                         },
                         custom_black_list={'bilinear_interp_v2'}):
-                    dict_result = ddp_model(images, use_corr=True) if nranks > 1 else model(images, use_corr=True)
+                    dict_result = ddp_model(inputs, use_corr=True) if nranks > 1 else model(inputs, use_corr=True)
                     u_s_result = ddp_model(img_u_s, use_corr=True) if nranks > 1 else model(img_u_s, use_corr=True)
+
+                    loss_list = corr_compute_loss(dict_result,
+                                                  u_s_result,
+                                                  labels,
+                                                  loss_computation,
+                                                  edges,
+                                                  losses,
+                                                  b_l,
+                                                  b_ul,
+                                                  num_classes,
+                                                  thresh_init)
+
                     loss_list = loss_computation(
                         logits_list=logits_list,
                         labels=labels,
@@ -212,13 +224,14 @@ def train_semi(model,
                 else:
                     scaler.minimize(optimizer, scaled)  # update parameters
             else:
-                dict_result = ddp_model(images, use_corr=True) if nranks > 1 else model(images, use_corr=True)
+                dict_result = ddp_model(inputs, use_corr=True) if nranks > 1 else model(inputs, use_corr=True)
                 u_s_result = ddp_model(img_u_s, use_corr=True) if nranks > 1 else model(img_u_s, use_corr=True)
-                loss_list = loss_computation(
-                    logits_list=logits_list,
-                    labels=labels,
-                    edges=edges,
-                    losses=losses)
+                loss_list = corr_compute_loss(dict_result, u_s_result, labels, loss_fn, b_l, b_ul, num_classes, thresh_init)
+                # loss_list = loss_computation(
+                #     logits_list=logits_list,
+                #     labels=labels,
+                #     edges=edges,
+                #     losses=losses)
                 loss = sum(loss_list)
                 loss.backward()
                 # if the optimizer is ReduceOnPlateau, the loss is the one which has been pass into step.
