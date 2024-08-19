@@ -140,6 +140,20 @@ class SemiConfig(object):
         return self.dic.get('batch_size', 1)
 
     @property
+    def thresh_init(self) -> float:
+        thresh_init = self.dic.get('thresh_init')
+        if not thresh_init:
+            raise RuntimeError('No thresh_init specified in the configuration file')
+        return thresh_init
+
+    @property
+    def num_classes(self) -> int:
+        num_classes = self.dic.get('num_classes')
+        if not num_classes:
+            raise RuntimeError('No num_classes specified in the configuration file')
+        return num_classes
+
+    @property
     def iters(self) -> int:
         iters = self.dic.get('iters')
         if not iters:
@@ -262,12 +276,6 @@ class SemiConfig(object):
         return self._losses
 
     @property
-    def kl_loss(self) -> dict:
-        if not hasattr(self, '_kl_loss'):
-            self._kl_losses = self._prepare_loss('kl_loss')
-        return self._kl_losses
-
-    @property
     def distill_loss(self) -> dict:
         if not hasattr(self, '_distill_losses'):
             self._distill_losses = self._prepare_loss('distill_loss')
@@ -360,7 +368,7 @@ class SemiConfig(object):
 
     @property
     def unlabeled_train_dataset_config(self) -> Dict:
-        return self.dic.get('unlabeled_dataset', {}).copy()
+        return self.dic.get('unlabeled_train_dataset', {}).copy()
 
     @property
     def val_dataset_config(self) -> Dict:

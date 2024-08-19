@@ -7,8 +7,9 @@ import paddle
 from paddleseg.core import infer
 from paddleseg.utils import (TimeAverager, calculate_eta, resume, logger,
                              worker_init_fn, train_profiler, op_flops_funs)
-from models.semi.corr_match.utils import corr_compute_loss
+
 from core.val import evaluate
+from models.semi.corr_match.utils import corr_compute_loss
 
 
 def check_logits_losses(logits_list, losses):
@@ -46,6 +47,8 @@ def loss_computation(logits_list, labels, edges, losses):
 def train_semi(model,
                train_dataset,
                unlabeled_train_dataset,
+               num_classes,
+               thresh_init,
                val_dataset=None,
                optimizer=None,
                save_dir='output',
@@ -174,8 +177,8 @@ def train_semi(model,
             images = data['img']
             labels = data['label'].astype('int64')
 
-            img_u_w = unlabeled_data['img_u_w']
-            img_u_s = unlabeled_data['img_u_s']
+            img_u_w = unlabeled_data['img_w']
+            img_u_s = unlabeled_data['img_s']
 
             edges = None
             if 'edge' in data.keys():
@@ -210,11 +213,11 @@ def train_semi(model,
                                                   num_classes,
                                                   thresh_init)
 
-                    loss_list = loss_computation(
-                        logits_list=logits_list,
-                        labels=labels,
-                        edges=edges,
-                        losses=losses)
+                    # loss_list = loss_computation(
+                    #     logits_list=logits_list,
+                    #     labels=labels,
+                    #     edges=edges,
+                    #     losses=losses)
                     loss = sum(loss_list)
 
                 scaled = scaler.scale(loss)  # scale the loss
@@ -226,7 +229,16 @@ def train_semi(model,
             else:
                 dict_result = ddp_model(inputs, use_corr=True) if nranks > 1 else model(inputs, use_corr=True)
                 u_s_result = ddp_model(img_u_s, use_corr=True) if nranks > 1 else model(img_u_s, use_corr=True)
-                loss_list = corr_compute_loss(dict_result, u_s_result, labels, loss_fn, b_l, b_ul, num_classes, thresh_init)
+                loss_list = corr_compute_loss(dict_result,
+                                              u_s_result,
+                                              labels,
+                                              loss_computation,
+                                              edges,
+                                              losses,
+                                              b_l,
+                                              b_ul,
+                                              num_classes,
+                                              thresh_init)
                 # loss_list = loss_computation(
                 #     logits_list=logits_list,
                 #     labels=labels,

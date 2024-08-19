@@ -15,11 +15,11 @@ class ThreshController:
         pred_gather = paddle.zeros([n, c, h, w])
         pred = pred_gather
         if ignore_mask is not None:
-            ignore_mask_gather = paddle.zeros([n, h, w]).cuda().long()
+            ignore_mask_gather = paddle.zeros([n, h, w])
             ignore_mask = ignore_mask_gather
         mask_pred = paddle.argmax(pred, axis=1)
-        pred_softmax = pred.softmax(axis=1)
-        pred_conf = pred_softmax.max(axis=1)[0]
+        pred_softmax = F.softmax(pred, axis=1)
+        pred_conf = paddle.max(pred_softmax, axis=1)
         unique_cls = paddle.unique(mask_pred)
         cls_num = len(unique_cls)
         new_global = 0.0
@@ -69,27 +69,27 @@ def corr_compute_loss(dict_result: dict,
     u_s_corr = u_s_results['corr_out']
 
     u_w_pred = u_w_pred.detach()
-    conf_u_w = u_w_pred.detach().softmax(axis=1).max(axis=1)[0]
+    conf_u_w = F.softmax(u_w_pred.detach(), axis=1).max(axis=1)[0]
     label_u = u_w_pred.detach().argmax(axis=1)
 
     thresh_controller.thresh_update(u_w_pred.detach(), update_g=True)
     thresh_global = thresh_controller.get_thresh_global()
     mask_indicator = (conf_u_w > thresh_global)
 
-    loss_s = loss_fn(l_pred, label, edges, losses)
-    loss_s_c = loss_fn(l_x_corr, label, edges, losses)
+    loss_s = loss_fn([l_pred], label, edges, losses)
+    loss_s_c = loss_fn([l_x_corr], label, edges, losses)
 
     softmax_pred_u_w = F.softmax(u_w_pred.detach(), axis=1)
     logsoftmax_pred_u_s1 = F.log_softmax(u_s_pred, axis=1)
-    loss_u_s = nn.KLDivLoss()(logsoftmax_pred_u_s1, softmax_pred_u_w) * mask_indicator
+    loss_u_s = nn.KLDivLoss()(logsoftmax_pred_u_s1 * mask_indicator, softmax_pred_u_w * mask_indicator)
 
-    l_u_w = loss_fn(u_w_pred, label_u, edges, losses) * mask_indicator
-    l_u_s = loss_fn(u_s_pred, label_u, edges, losses) * mask_indicator
+    l_u_w = loss_fn([u_w_pred * mask_indicator], label_u * mask_indicator, edges, losses)
+    l_u_s = loss_fn([u_s_pred * mask_indicator], label_u * mask_indicator, edges, losses)
     loss_u = (sum(l_u_w) + sum(l_u_s)) * 0.5
 
-    loss_u_w_c = loss_fn(u_w_corr, label_u, edges, losses) * mask_indicator
-    loss_u_s_c = loss_fn(u_s_corr, label_u, edges, losses) * mask_indicator
-    loss_u_c = (loss_u_w_c + loss_u_s_c) * 0.5
+    loss_u_w_c = loss_fn([u_w_corr * mask_indicator], label_u * mask_indicator, edges, losses)
+    loss_u_s_c = loss_fn([u_s_corr * mask_indicator], label_u * mask_indicator, edges, losses)
+    loss_u_c = (sum(loss_u_w_c) + sum(loss_u_s_c)) * 0.5
 
-    loss = (sum(loss_s) + sum(loss_s_c)) * 0.5 + (loss_u * 0.5 + loss_u_s * 0.25 + loss_u_c * 0.25)
-    return loss
+    # loss = (sum(loss_s) + sum(loss_s_c)) * 0.5 + (loss_u * 0.5 + loss_u_s * 0.25 + loss_u_c * 0.25)
+    return [sum(loss_s) * 0.5, sum(loss_s_c) * 0.5, loss_u * 0.5, loss_u_s * 0.25, loss_u_c * 0.25]

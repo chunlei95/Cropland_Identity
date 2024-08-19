@@ -1,4 +1,3 @@
-import argparse
 import os.path
 from glob import glob
 from shutil import copy
@@ -7,10 +6,11 @@ import cv2
 import numpy as np
 import tifffile
 
-from datasets.labelme_utils import main
-
 
 def split_image(img_path, save_path):
+    """
+    将下载的大幅遥感图像切割成512 x 512的小幅图像
+    """
     img_arr = tifffile.imread(img_path)
     img_height, img_width = img_arr.shape[0:-1]
     assert img_arr.shape[-1] == 4
@@ -30,32 +30,45 @@ def split_image(img_path, save_path):
             cv2.imwrite(str(img_save_path), sub_arr)
 
 
-def extract_area_and_label(img_save_path, ann_save_path, img_path, ann_path, crop_size=[256, 256], pixel_interval=128):
-    img_paths = glob(img_path + '/*')
-    for i in range(len(img_paths)):
-        img_path = img_paths[i]
+def extract_area_and_label(img_save_dir, img_dir, ann_save_dir=None, ann_dir=None, crop_size=[256, 256],
+                           pixel_interval=128, unlabeled=True):
+    """
+    将512 x 512的图像裁剪成256 x 256，每隔pixel_interval个像素裁剪一次
+    """
+    if not os.path.exists(img_save_dir):
+        os.makedirs(img_save_dir)
+    if ann_save_dir is not None and not os.path.exists(ann_save_dir) and not unlabeled:
+        os.makedirs(ann_save_dir)
+    img_paths = glob(img_dir + '/*')
+    for k in range(len(img_paths)):
+        img_path = img_paths[k]
         img_name, img_ext = os.path.splitext(os.path.split(img_path)[-1])
-        ann_path = os.path.join(ann_path, img_name + '.png')
-        if not os.path.exists(ann_path):
-            raise FileNotFoundError('annotation file not found: ' + str(ann_path))
         img_arr = cv2.imread(img_path, cv2.IMREAD_COLOR)
-        ann_arr = cv2.imread(str(ann_path), cv2.IMREAD_GRAYSCALE)
+        if not unlabeled:
+            ann_path = os.path.join(ann_dir, img_name + '.png')
+            if not os.path.exists(ann_path):
+                raise FileNotFoundError('annotation file not found: ' + str(ann_path))
+            ann_arr = cv2.imread(str(ann_path), cv2.IMREAD_GRAYSCALE)
         im_h, im_w = img_arr.shape[0:-1]
-        num_h, num_w = int(im_h / pixel_interval), int(im_w / pixel_interval)
+        num_h, num_w = im_h // pixel_interval - 1, im_w // pixel_interval - 1
         for i in range(num_h):
             for j in range(num_w):
                 sub_num = i * (num_w) + j + 1
-                img_save_path = os.path.join(img_save_path, img_name + '_' + str(sub_num) + img_ext)
-                ann_save_path = os.path.join(ann_save_path, img_name + '_' + str(sub_num) + '.png')
+                img_save_path = os.path.join(img_save_dir, img_name + '_' + str(sub_num) + img_ext)
                 sub_img = img_arr[i * pixel_interval: i * pixel_interval + crop_size[0],
                           j * pixel_interval: j * pixel_interval + crop_size[1], :]
-                sub_ann = ann_arr[i * pixel_interval: i * pixel_interval + crop_size[0],
-                          j * pixel_interval: j * pixel_interval + crop_size[0], :]
                 cv2.imwrite(str(img_save_path), sub_img)
-                cv2.imwrite(str(ann_save_path), sub_ann)
+                if not unlabeled:
+                    ann_save_path = os.path.join(ann_save_dir, img_name + '_' + str(sub_num) + '.png')
+                    sub_ann = ann_arr[i * pixel_interval: i * pixel_interval + crop_size[0],
+                              j * pixel_interval: j * pixel_interval + crop_size[1]]
+                    cv2.imwrite(str(ann_save_path), sub_ann)
 
 
 def split_dataset(root_path, test_ratio, labeled_ratio=1.0 / 16):
+    """
+    数据集分割，分为有标签图像、无标签图像、验证图像，用于半监督学习，此处为还未标注的图像
+    """
     imgs = glob(root_path + '/*')
     counts = len(imgs)
     test_size = int(counts * test_ratio)
@@ -91,7 +104,13 @@ def extract_label(label_root, save_path):
 
 
 def label_map(label_root):
-    label_paths = glob(label_root + '/*')
+    """
+    将标签值为255的像素映射为像素值1，表示第一个类别，此处暂时只适用于二分类
+    """
+    if os.path.isfile(label_root):
+        label_paths = [label_root]
+    else:
+        label_paths = glob(label_root + '/*')
     for p in label_paths:
         label_arr = cv2.imread(p, cv2.IMREAD_GRAYSCALE)
         label_value = label_arr.max()
@@ -100,28 +119,53 @@ def label_map(label_root):
         cv2.imwrite(p, label_arr)
 
 
+def show_label(label_path):
+    """
+    查看单张表示为类别值的标签图，此处暂时只适用于二分类
+    """
+    ann_arr = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+    ann_ = ann_arr.copy()
+    ann_arr[ann_ == 1] = 255
+    cv2.imshow('label', ann_arr)
+    cv2.waitKey()
+    cv2.destroyAllWindows()
+
+
 if __name__ == '__main__':
+    # 数据集划分
     # img_path = r'D:/datasets/Cropland_Identity/cropland_identity_datasource/Cropland_Identity/region6'
     # split_image(img_path, 'D:/datasets/cropland_identity/Cropland_Identity')
     # split_dataset(img_path, 0.2, 1.0 / 16)
+
+    # 将labelme标注的json形式标签转换为png标签图像，同时进行类别转换
     # parser = argparse.ArgumentParser()
     # parser.add_argument("json_file")
     # parser.add_argument("-o", "--out", default=None)
     # args = parser.parse_args()
-    # file_path = args.json_file
-    # json_paths = glob(file_path + '/*')
+    # if os.path.isfile(args.json_file):
+    #     json_paths = [args.json_file]
+    # else:
+    #     file_path = args.json_file
+    #     json_paths = glob(file_path + '/*')
     # for path in json_paths:
     #     main(path, args)
+    # label_map("D:/datasets/Cropland_Identity/label_json/val/region5_34/label.png")
+
     # json_label_path = 'D:/datasets/Cropland_Identity/label_json/train_labeled'
     # save_label_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/ann_dir/train_labeled'
     # extract_label(json_label_path, save_label_path)
     # label_map(save_label_path)
+
     # img_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/ann_dir/train_labeled/region1_67.png'
     # img_arr = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
     # print(img_arr.max())
 
-    img_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/img_dir/train_labeled'
-    ann_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/ann_dir/train_labeled'
-    img_save_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/img_dir/train_labeled'
-    ann_save_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/ann_dir/train_labeled'
-    extract_area_and_label(img_save_path, ann_save_path, img_path, ann_path)
+    # 512 * 512切成 256 * 256的（在标注之后切，标签图也同步切割，无标签图像无需切标签）
+    img_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/img_dir/train_unlabeled'
+    # ann_path = 'D:/datasets/Cropland_Small/ann_dir/train'
+    img_save_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/img_dir/train_unlabeled'
+    # ann_save_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/ann_dir/train_labeled'
+    extract_area_and_label(img_save_path, img_path, unlabeled=True)
+
+    # 查看标签图
+    # show_label('D:/datasets/Cropland_Identity/Cropland_Identity_256/ann_dir/val/region5_34.png')

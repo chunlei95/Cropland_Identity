@@ -24,7 +24,7 @@ class CorrModule(nn.Layer):
         x1 = paddle.flatten(x1, 2)
         x2 = paddle.flatten(x2, 2)
 
-        predict = F.interpolate(predict.detach(), x.shape[2:], align_corners=True)
+        predict = F.interpolate(predict.detach(), x.shape[2:], mode='bilinear', align_corners=True)
         pred_temp = paddle.flatten(predict, 2)
 
         # C = Softmax(w1⊤ · w2)/√D ****************************************************************************
@@ -33,7 +33,7 @@ class CorrModule(nn.Layer):
         # enable correlation matching to quantify the degree of pairwise similarity. Thus, we compute the
         # correlation map C by performing a matrix multiplication between all pairs of feature vectors
         corr_map = paddle.matmul(paddle.transpose(x1, (0, 2, 1)), x2) / paddle.sqrt(
-            paddle.to_tensor(x1.shape[1].float()))  # (b, hw, hw)
+            paddle.to_tensor(float(x1.shape[1])))  # (b, hw, hw)
         # 此处在axis=1和axis=-1的结果其实都是一样的
         corr_map = F.softmax(corr_map, axis=-1)  # (b, hw, hw)
         # ****************************************************************************************************
@@ -53,18 +53,18 @@ class CorrModule(nn.Layer):
 
     def sample(self, corr_map, h_in, w_in):
         index = paddle.randint(0, h_in * w_in - 1, [128])
-        sampled_corr_map = corr_map[:, index.long(), :]
+        sampled_corr_map = corr_map[:, index, :]
         return sampled_corr_map
 
     def normalize_corr_map(self, corr_map, h_in, w_in, h_out, w_out):
         n, m, hw = corr_map.shape  # 其中 m = hw
         corr_map = paddle.reshape(corr_map, (n, m, 1, h_in, w_in))
         corr_map = paddle.flatten(corr_map, 0, 1)
-        corr_map = F.interpolate(corr_map, h_out, w_out, align_corners=True)
+        corr_map = F.interpolate(corr_map, (h_out, w_out), mode='bilinear', align_corners=True)
         corr_map = paddle.flatten(corr_map, 2)
         range_ = paddle.max(corr_map, axis=1, keepdim=True)[0] - paddle.min(corr_map, axis=1, keepdim=True)[0]
         temp_map = ((- paddle.min(corr_map, axis=1, keepdim=True)[0]) + corr_map) / range_
         corr_map = (temp_map > 0.5)
-        norm_corr_map = paddle.transpose(corr_map, (1, 0)).reshape((hw, n, m))
-        norm_corr_map = paddle.transpose(norm_corr_map, (1, 2, 0)).resahpe((n, m, h_out, w_out))
+        norm_corr_map = paddle.transpose(corr_map, (1, 0)).reshape((h_out * w_out, n, m))
+        norm_corr_map = paddle.transpose(norm_corr_map, (1, 2, 0)).reshape((n, m, h_out, w_out))
         return norm_corr_map

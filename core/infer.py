@@ -155,7 +155,7 @@ def inference(model,
     if hasattr(model, 'data_format') and model.data_format == 'NHWC':
         im = im.transpose((0, 2, 3, 1))
     if not is_slide:
-        _, logits = model(im)
+        logits = model(im)
         if not isinstance(logits, collections.abc.Sequence):
             raise TypeError(
                 "The type of logits must be one of collections.abc.Sequence, e.g. list, tuple. But received {}"

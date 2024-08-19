@@ -142,6 +142,38 @@ class SegmentationHead(nn.Layer):
         return x
 
 
+class SegmentationHead_Semi(nn.Layer):
+    def __init__(self, in_channels, norm_type=None, act_type=nn.GELU):
+        super().__init__()
+        self.de_conv = nn.Conv2DTranspose(in_channels=in_channels,
+                                          out_channels=in_channels,
+                                          kernel_size=3,
+                                          stride=2,
+                                          padding=1)
+        self.norm = BuildNorm(in_channels, norm_type=norm_type)
+        self.act = act_type()
+        self.conv_out = ConvNormAct(in_channels,
+                                    in_channels,
+                                    kernel_size=3,
+                                    padding=1,
+                                    norm_type=norm_type,
+                                    act_type=act_type)
+        self.conv = ConvNormAct(in_channels=in_channels,
+                                out_channels=in_channels,
+                                kernel_size=3,
+                                padding=1,
+                                norm_type=norm_type,
+                                act_type=act_type)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.de_conv(x, output_size=[x.shape[-2] * 2, x.shape[-1] * 2])
+        x = self.norm(x)
+        x = self.act(x)
+        x = self.conv_out(x)
+        return x
+
+
 # noinspection PyMethodMayBeStatic,PyProtectedMember
 class ConditionalPositionEncoding(nn.Layer):
     def __init__(self, channels, encode_size):

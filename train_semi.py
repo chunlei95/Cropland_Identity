@@ -54,7 +54,7 @@ def parse_args():
         dest='save_interval',
         help='How many iters to save a model snapshot once during training.',
         type=int,
-        default=50)
+        default=100)
     parser.add_argument(
         '--resume_model',
         dest='resume_model',
@@ -205,7 +205,6 @@ def main(args):
 
     val_dataset = cfg.val_dataset if args.do_eval else None
     losses = cfg.loss
-    kl_loss = cfg.kl_loss
 
     msg = '\n---------------Config Information---------------\n'
     msg += str(cfg)
@@ -222,6 +221,8 @@ def main(args):
         cfg.model,
         train_dataset,
         unlabeled_train_dataset,
+        num_classes=cfg.num_classes,
+        thresh_init=cfg.thresh_init,
         val_dataset=val_dataset,
         optimizer=cfg.optimizer,
         save_dir=args.save_dir,
@@ -233,7 +234,6 @@ def main(args):
         num_workers=args.num_workers,
         use_vdl=args.use_vdl,
         losses=losses,
-        kl_loss=kl_loss,
         keep_checkpoint_max=args.keep_checkpoint_max,
         test_config=cfg.test_config,
         precision=args.precision,

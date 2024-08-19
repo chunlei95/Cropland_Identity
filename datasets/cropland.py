@@ -1,3 +1,4 @@
+import math
 import os.path
 import os.path as osp
 import shutil
@@ -22,16 +23,23 @@ class CroplandDataset(paddle.io.Dataset):
                  dataset_root,
                  transforms,
                  strong_transforms=None,
+                 latest_transforms=None,
                  augment_train=False,
                  augment_transforms=None,
                  augment_times=1,
                  img_dir=None,
                  ann_dir=None,
-                 edge=False):
+                 edge=False,
+                 unlabeled_samples=None):
         super().__init__()
         self.dataset_root = dataset_root
+
         self.transforms = Compose(transforms)
+
+        # 半监督专用
         self.strong_transforms = strong_transforms
+        self.latest_transforms = latest_transforms
+
         mode = mode.lower()
         self.mode = mode
         self.edge = edge
@@ -52,15 +60,23 @@ class CroplandDataset(paddle.io.Dataset):
                 img_dir = osp.join(self.dataset_root, img_dir)
             if not (ann_dir is None or osp.isabs(ann_dir)):
                 ann_dir = osp.join(self.dataset_root, ann_dir)
-        image_paths = glob(img_dir + '/*')
-        grt_paths = glob(ann_dir + '/*')
-        assert len(image_paths) == len(grt_paths)
-        image_paths.sort()
-        grt_paths.sort()
 
-        for image_path, grt_path in zip(image_paths, grt_paths):
-            assert image_path.split(image_path)[-1] == grt_path.split(grt_path)[-1]
-            self.file_list.append([image_path, grt_path])
+        image_paths = glob(img_dir + '/*')
+        if self.mode == 'train_unlabeled':
+            for image_path in image_paths:
+                self.file_list.append(image_path)
+        else:
+            grt_paths = glob(ann_dir + '/*')
+            assert len(image_paths) == len(grt_paths)
+            image_paths.sort()
+            grt_paths.sort()
+
+            for image_path, grt_path in zip(image_paths, grt_paths):
+                assert image_path.split(image_path)[-1] == grt_path.split(grt_path)[-1]
+                self.file_list.append([image_path, grt_path])
+
+        if unlabeled_samples is not None:
+            self.file_list = self.file_list * math.ceil(unlabeled_samples // len(self.file_list))
 
         if augment_train:
             augment_list = []
@@ -99,23 +115,36 @@ class CroplandDataset(paddle.io.Dataset):
     def __getitem__(self, idx):
         data = {}
         data['trans_info'] = []
-        image_path, label_path = self.file_list[idx]
-        data['img'] = image_path
-        data['label'] = label_path
-        # If key in gt_fields, the data[key] have transforms synchronous.
-        data['gt_fields'] = []
-        if self.mode == 'val' or self.mode == 'test':
-            data = self.transforms(data)
-            data['label'] = data['label'][np.newaxis, :, :]
-        elif self.mode == 'train_unlabeled':
-            data = self.transforms(data)
+        if self.mode == 'train_unlabeled':
+            image_path = self.file_list[idx]
+            data['img'] = image_path
+            data_w = self.transforms(data)
+            data_w['img'] = np.transpose(data_w['img'], (1, 2, 0))
+            data_s = dict(img=data_w['img'], trans_info=data_w['trans_info'])
+            for op in self.strong_transforms:
+                data_s = op(data_s)
+            for op in self.latest_transforms:
+                data_w = op(data_w)
+                data_s = op(data_s)
+            data_w['img'] = np.transpose(data_w['img'], (2, 0, 1))
+            data_s['img'] = np.transpose(data_s['img'], (2, 0, 1))
+            data = dict(img_w=data_w['img'], img_s=data_s['img'])
         else:
-            data['gt_fields'].append('label')
-            data = self.transforms(data)
-            if self.edge:
-                edge_mask = F.mask_to_binary_edge(
-                    data['label'], radius=2, num_classes=self.num_classes)
-                data['edge'] = edge_mask
+            image_path, label_path = self.file_list[idx]
+            data['img'] = image_path
+            data['label'] = label_path
+            # If key in gt_fields, the data[key] have transforms synchronous.
+            data['gt_fields'] = []
+            if self.mode == 'val' or self.mode == 'test':
+                data = self.transforms(data)
+                data['label'] = data['label'][np.newaxis, :, :]
+            else:
+                data['gt_fields'].append('label')
+                data = self.transforms(data)
+                if self.edge:
+                    edge_mask = F.mask_to_binary_edge(
+                        data['label'], radius=2, num_classes=self.num_classes)
+                    data['edge'] = edge_mask
         return data
 
     def __len__(self):

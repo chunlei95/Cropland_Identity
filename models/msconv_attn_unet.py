@@ -6,7 +6,7 @@ from paddleseg.cvlibs import manager
 
 from models.layers.layers import PatchCombined, OverlapPatchEmbed, \
     ConvStem, SegmentationHead, BuildNorm, ConditionalPositionEncoding, \
-    SkipLayer, PatchDecompose
+    SkipLayer, PatchDecompose, SegmentationHead_Semi
 
 
 # noinspection PyProtectedMember,PyMethodMayBeStatic
@@ -152,7 +152,8 @@ class ConvAttnUNet(nn.Layer):
                  drop_rate=0.5,
                  conv_attn_num=1,
                  norm_type=None,
-                 act_type=nn.GELU):
+                 act_type=nn.GELU,
+                 semi_train=False):
         super().__init__()
         assert len(attn_kernel_sizes) == len(dilations) == num_stages == len(local_kernel_sizes) == len(
             stage_out_channels)
@@ -162,6 +163,7 @@ class ConvAttnUNet(nn.Layer):
             norm_type = eval(norm_type)
         if type(act_type) == str:
             act_type = eval(act_type)
+        self.semi_train = semi_train
         self.conv_stem = ConvStem(in_channels=in_channels,
                                   out_channels=stage_out_channels[0],
                                   norm_type=norm_type,
@@ -244,6 +246,7 @@ class ConvAttnUNet(nn.Layer):
             x = merge_layer(x)
 
         encoder_out = x
+
         skip_features.reverse()
 
         for skip_x, decoder_layers, expand_layer, skip_layer in zip(skip_features, self.stage_decoder_layers,
@@ -256,7 +259,10 @@ class ConvAttnUNet(nn.Layer):
             x = decoder_layers(x)
         x = self.final_expand(x)
         x = self.segmentation_head(x)
-        return encoder_out, [x]
+        if self.semi_train:
+            return encoder_out, [x]
+        else:
+            return [x]
 
 
 if __name__ == '__main__':

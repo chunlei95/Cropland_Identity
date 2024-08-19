@@ -1,0 +1,80 @@
+_base_: './_base_/dataset/cropland.yaml'
+
+batch_size: 4
+iters: 80000
+num_classes: 2
+thresh_init: 0.85
+
+unlabeled_train_dataset:
+  type: CroplandDataset
+  dataset_root: D:/datasets/Cropland_Identity/Cropland_Identity_256
+  img_dir: img_dir/train_unlabeled
+  transforms:
+    - type: ResizeStepScaling
+      min_scale_factor: 0.5
+      max_scale_factor: 2.0
+      scale_step_size: 0.25
+    - type: RandomPaddingCrop
+      crop_size: [ 256, 256 ]
+    - type: RandomHorizontalFlip
+  strong_transforms:
+    - type: RandomDistort
+      brightness_range: 0.4
+      contrast_range: 0.4
+      saturation_range: 0.4
+    - type: RandomBlur
+    - type: RandomNoise
+  latest_transforms:
+    - type: Normalize
+  mode: train_unlabeled
+
+model:
+  type: CorrMatch
+  backbone:
+    type: ConvAttnUNet
+    in_channels: 3
+    num_classes: 2
+    num_stages: 4
+    patch_size: 3
+    merge_size: 3
+    encode_size: 3
+    stage_out_channels: [ 96, 192, 384, 768 ]
+    depths: [ 2, 2, 2, 1 ]
+    local_kernel_sizes: [ 3, 3, 3, 3 ]
+    attn_kernel_sizes: [ [ 7, 9, 11 ],
+                         [ 7, 9, 11 ],
+                         [ 7, 9, 11 ],
+                         [ 7, 9, 11 ] ]
+    dilations: [ [ 3, 3, 3 ],
+                 [ 3, 3, 3 ],
+                 [ 3, 3, 3 ],
+                 [ 3, 3, 3 ] ]
+    drop_rate: 0.5
+    conv_attn_num: 1
+    norm_type: nn.LayerNorm
+    act_type: nn.GELU
+    semi_train: True
+  in_channels: 768
+  corr_channels: 768
+  num_classes: 2
+  drop_rate: 0.2
+  norm_type: nn.LayerNorm
+  act_type: nn.GELU
+
+optimizer:
+  _inherited_: False
+  type: AdamW
+  weight_decay: 0.01
+
+lr_scheduler:
+  type: PolynomialDecay
+  warmup_iters: 1500
+  warmup_start_lr: 1.0e-6
+  learning_rate: 0.0001
+  end_lr: 0.0
+  power: 1.0
+
+loss:
+  types:
+    - type: CrossEntropyLoss
+  coef: [ 1 ]

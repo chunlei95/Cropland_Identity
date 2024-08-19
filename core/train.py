@@ -187,7 +187,7 @@ def train(model,
                             "elementwise_add", "batch_norm", "sync_batch_norm"
                         },
                         custom_black_list={'bilinear_interp_v2'}):
-                    _, logits_list = ddp_model(images) if nranks > 1 else model(
+                    logits_list = ddp_model(images) if nranks > 1 else model(
                         images)
                     loss_list = loss_computation(
                         logits_list=logits_list,
@@ -203,7 +203,7 @@ def train(model,
                 else:
                     scaler.minimize(optimizer, scaled)  # update parameters
             else:
-                _, logits_list = ddp_model(images) if nranks > 1 else model(images)
+                logits_list = ddp_model(images) if nranks > 1 else model(images)
                 loss_list = loss_computation(
                     logits_list=logits_list,
                     labels=labels,
