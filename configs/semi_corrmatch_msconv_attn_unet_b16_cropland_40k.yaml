@@ -1,9 +1,36 @@
 _base_: './_base_/dataset/cropland.yaml'
 
-batch_size: 4
+batch_size: 2
 iters: 80000
 num_classes: 2
 thresh_init: 0.85
+
+
+train_dataset:
+  type: CroplandDataset
+  dataset_root: D:/datasets/Cropland_Identity/Cropland_Identity_256
+  img_dir: img_dir/train_labeled
+  ann_dir: ann_dir/train_labeled
+  transforms:
+    - type: ResizeStepScaling
+      min_scale_factor: 0.5
+      max_scale_factor: 2.0
+      scale_step_size: 0.25
+    - type: RandomPaddingCrop
+      crop_size: [ 256, 256 ]
+    - type: RandomHorizontalFlip
+    - type: RandomDistort
+      brightness_range: 0.4
+      contrast_range: 0.4
+      saturation_range: 0.4
+    - type: RandomBlur
+      prob: 0.2
+    - type: RandomNoise
+      prob: 0.2
+    - type: Normalize
+  mode: train
+  unlabeled_samples: 11700
+
 
 unlabeled_train_dataset:
   type: CroplandDataset
@@ -23,7 +50,9 @@ unlabeled_train_dataset:
       contrast_range: 0.4
       saturation_range: 0.4
     - type: RandomBlur
+      prob: 0.8
     - type: RandomNoise
+      prob: 0.8
   latest_transforms:
     - type: Normalize
   mode: train_unlabeled
@@ -55,9 +84,9 @@ model:
     act_type: nn.GELU
     semi_train: True
   in_channels: 768
-  corr_channels: 768
+  corr_channels: 96
   num_classes: 2
-  drop_rate: 0.2
+  drop_rate: 0.1
   norm_type: nn.LayerNorm
   act_type: nn.GELU
 

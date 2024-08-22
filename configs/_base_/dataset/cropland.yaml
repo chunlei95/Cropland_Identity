@@ -3,9 +3,9 @@ iters: 40000
 
 train_dataset:
   type: CroplandDataset
-  dataset_root: D:/datasets/Cropland_Identity/Cropland_Identity_256
-  img_dir: img_dir/train_labeled
-  ann_dir: ann_dir/train_labeled
+  dataset_root: D:/datasets/Cropland_Identity/new_data/data_source
+  img_dir: images
+  ann_dir: labels
 #  augment_train: True
 #  augment_times: 5
 #  augment_transforms:
@@ -43,9 +43,9 @@ train_dataset:
 
 val_dataset:
   type: CroplandDataset
-  dataset_root: D:/datasets/Cropland_Identity/Cropland_Identity_256
-  img_dir: img_dir/val
-  ann_dir: ann_dir/val
+  dataset_root: D:/datasets/Cropland_Identity/new_data/data_source
+  img_dir: images
+  ann_dir: labels
   transforms:
     - type: Normalize
   mode: val

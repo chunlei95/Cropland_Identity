@@ -3,14 +3,14 @@ import random
 
 import numpy as np
 import paddle
-from paddleseg.utils import get_sys_env, logger, config_check
+from paddleseg.utils import get_sys_env, logger
 
 from core import train
 from cvlibs.config import Config
 from datasets import CroplandDataset
-from models import ConvAttnUNet, RMMedNet
+from models import ConvAttnUNet, RMMedNet, LGGFormer
 
-__all__ = ['CroplandDataset', 'ConvAttnUNet', 'RMMedNet']
+__all__ = ['CroplandDataset', 'ConvAttnUNet', 'RMMedNet', 'LGGFormer']
 
 
 def parse_args():

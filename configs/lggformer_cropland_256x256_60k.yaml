@@ -4,18 +4,19 @@ batch_size: 8
 iters: 60000
 
 model:
-  type: RMMedNet
+  type: LGGFormer
   in_channels: 3
   num_classes: 2
   patch_size: 3
-  stage_channels: [ 96, 192, 384, 768 ]
-  encoder_depth: [ 2, 2, 2, 2 ] # 调到3很差劲
-  decoder_depth: [ 2, 2, 2 ] # 调到3很差劲
-#  stage_kernels: [ 3, 3, 3, 3 ]
-  drop_rate: 0.5
+  stage_channels: [96, 192, 384, 768]
+  encoder_stage_blocks: [2, 2, 2, 2]
+  decoder_stage_blocks: [2, 2, 2]
+  num_heads: [2, 4, 8, 16]
+  trans_layers: 2
+  attn_drop: 0.5
+  drop_path_rate: 0.5
   norm_type: nn.LayerNorm
   act_type: nn.GELU
-
 
 optimizer:
   _inherited_: False

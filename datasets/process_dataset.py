@@ -1,6 +1,8 @@
+import argparse
 import os.path
 from glob import glob
 from shutil import copy
+from labelme_utils import main
 
 import cv2
 import numpy as np
@@ -50,7 +52,7 @@ def extract_area_and_label(img_save_dir, img_dir, ann_save_dir=None, ann_dir=Non
                 raise FileNotFoundError('annotation file not found: ' + str(ann_path))
             ann_arr = cv2.imread(str(ann_path), cv2.IMREAD_GRAYSCALE)
         im_h, im_w = img_arr.shape[0:-1]
-        num_h, num_w = im_h // pixel_interval - 1, im_w // pixel_interval - 1
+        num_h, num_w = im_h // pixel_interval, im_w // pixel_interval
         for i in range(num_h):
             for j in range(num_w):
                 sub_num = i * (num_w) + j + 1
@@ -149,23 +151,22 @@ if __name__ == '__main__':
     #     json_paths = glob(file_path + '/*')
     # for path in json_paths:
     #     main(path, args)
-    # label_map("D:/datasets/Cropland_Identity/label_json/val/region5_34/label.png")
 
-    # json_label_path = 'D:/datasets/Cropland_Identity/label_json/train_labeled'
-    # save_label_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/ann_dir/train_labeled'
+    # labelme转换json到png时会是一个文件夹一个图像，此处用于从文件夹中提取标签的png图像到一个指定文件夹，并对标签映射为类别标签形式
+    # json_label_path = 'D:/datasets/Cropland_Identity/label_json/part2/json_label'
+    # save_label_path = 'D:/datasets/Cropland_Identity/label_json/part2/png_labels'
     # extract_label(json_label_path, save_label_path)
     # label_map(save_label_path)
 
-    # img_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/ann_dir/train_labeled/region1_67.png'
-    # img_arr = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-    # print(img_arr.max())
-
     # 512 * 512切成 256 * 256的（在标注之后切，标签图也同步切割，无标签图像无需切标签）
-    img_path = 'D:/datasets/Cropland_Identity/Cropland_Identity/img_dir/train_unlabeled'
-    # ann_path = 'D:/datasets/Cropland_Small/ann_dir/train'
-    img_save_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/img_dir/train_unlabeled'
-    # ann_save_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/ann_dir/train_labeled'
-    extract_area_and_label(img_save_path, img_path, unlabeled=True)
+    img_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/img_dir/val'
+    ann_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/ann_dir/val'
+    img_save_path = 'D:/datasets/Cropland_Identity/new_data/data_source/images'
+    ann_save_path = 'D:/datasets/Cropland_Identity/new_data/data_source/labels'
+    extract_area_and_label(img_save_path, img_path, ann_save_path, ann_path,
+                           crop_size=[256, 256],
+                           pixel_interval=256,
+                           unlabeled=False)
 
     # 查看标签图
-    # show_label('D:/datasets/Cropland_Identity/Cropland_Identity_256/ann_dir/val/region5_34.png')
+    # show_label('D:/datasets/Cropland_Small/ann_dir/train/region5_251.png')

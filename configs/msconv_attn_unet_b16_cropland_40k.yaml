@@ -1,7 +1,7 @@
 _base_: './_base_/dataset/cropland.yaml'
 
 batch_size: 8
-iters: 40000
+iters: 60000
 
 model:
   type: ConvAttnUNet

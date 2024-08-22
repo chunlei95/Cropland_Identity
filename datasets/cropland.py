@@ -22,6 +22,7 @@ class CroplandDataset(paddle.io.Dataset):
                  mode,
                  dataset_root,
                  transforms,
+                 test_ratio=0.2,
                  strong_transforms=None,
                  latest_transforms=None,
                  augment_train=False,
@@ -62,6 +63,7 @@ class CroplandDataset(paddle.io.Dataset):
                 ann_dir = osp.join(self.dataset_root, ann_dir)
 
         image_paths = glob(img_dir + '/*')
+
         if self.mode == 'train_unlabeled':
             for image_path in image_paths:
                 self.file_list.append(image_path)
@@ -71,6 +73,19 @@ class CroplandDataset(paddle.io.Dataset):
             image_paths.sort()
             grt_paths.sort()
 
+            np.random.seed(1024)
+            np.random.shuffle(image_paths)
+            np.random.seed(1024)
+            np.random.shuffle(grt_paths)
+            file_len = len(image_paths)
+            val_len = math.ceil(file_len * test_ratio)
+
+            if self.mode == 'val':
+                image_paths = image_paths[:val_len]
+                grt_paths = grt_paths[:val_len]
+            else:  # 训练情况
+                image_paths = image_paths[val_len:]
+                grt_paths = grt_paths[val_len:]
             for image_path, grt_path in zip(image_paths, grt_paths):
                 assert image_path.split(image_path)[-1] == grt_path.split(grt_path)[-1]
                 self.file_list.append([image_path, grt_path])
