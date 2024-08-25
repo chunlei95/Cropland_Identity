@@ -159,14 +159,14 @@ if __name__ == '__main__':
     # label_map(save_label_path)
 
     # 512 * 512切成 256 * 256的（在标注之后切，标签图也同步切割，无标签图像无需切标签）
-    img_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/img_dir/val'
-    ann_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/ann_dir/val'
-    img_save_path = 'D:/datasets/Cropland_Identity/new_data/data_source/images'
-    ann_save_path = 'D:/datasets/Cropland_Identity/new_data/data_source/labels'
-    extract_area_and_label(img_save_path, img_path, ann_save_path, ann_path,
-                           crop_size=[256, 256],
-                           pixel_interval=256,
-                           unlabeled=False)
+    # img_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/img_dir/val'
+    # ann_path = 'D:/datasets/Cropland_Identity/Cropland_Identity_256/ann_dir/val'
+    # img_save_path = 'D:/datasets/Cropland_Identity/new_data/data_source/images'
+    # ann_save_path = 'D:/datasets/Cropland_Identity/new_data/data_source/labels'
+    # extract_area_and_label(img_save_path, img_path, ann_save_path, ann_path,
+    #                        crop_size=[256, 256],
+    #                        pixel_interval=256,
+    #                        unlabeled=False)
 
     # 查看标签图
-    # show_label('D:/datasets/Cropland_Small/ann_dir/train/region5_251.png')
+    show_label('D:/PycharmProjects/Paddle_Seg/output/result/pseudo_color_prediction/edge/test_area_1.png')

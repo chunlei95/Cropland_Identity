@@ -6,8 +6,9 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 from paddleseg import utils
-from core import infer
 from paddleseg.utils import logger, progbar, visualize
+
+from core import infer
 
 
 def mkdir(path):
@@ -67,8 +68,16 @@ def predict(model,
         custom_color (list, optional): Save images with a custom color map. Default: None, use paddleseg's default color map.
 
     """
-    utils.utils.load_entire_model(model, model_path)
-    model.eval()
+    # utils.utils.load_entire_model(model, model_path)
+    single_model_predict = True
+    if type(model) == list and len(model_path) > 1:
+        assert len(model) == len(model_path)
+        for i in range(len(model)):
+            utils.utils.load_entire_model(model[i], model_path[i])
+        single_model_predict = False
+    else:
+        utils.utils.load_entire_model(model, model_path[0])
+        model.eval()
     nranks = paddle.distributed.get_world_size()
     local_rank = paddle.distributed.get_rank()
     if nranks > 1:
@@ -97,6 +106,15 @@ def predict(model,
                     is_slide=is_slide,
                     stride=stride,
                     crop_size=crop_size)
+            elif not single_model_predict:
+                pred, _ = infer.multi_model_inference(
+                    model,
+                    data['img'],
+                    trans_info=data['trans_info'],
+                    is_slide=is_slide,
+                    stride=stride,
+                    crop_size=crop_size
+                )
             else:
                 pred, _ = infer.inference(
                     model,
@@ -104,7 +122,8 @@ def predict(model,
                     trans_info=data['trans_info'],
                     is_slide=is_slide,
                     stride=stride,
-                    crop_size=crop_size)
+                    crop_size=crop_size,
+                    edge=False)
             if pred.shape[2:] != data['img'].shape[2:]:
                 pred = F.interpolate(pred, data['img'].shape[2:])
             pred = paddle.squeeze(pred)

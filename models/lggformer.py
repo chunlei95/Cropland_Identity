@@ -9,7 +9,7 @@ from paddleseg.cvlibs import manager
 from paddleseg.models.backbones.transformer_utils import *
 
 from models.layers.layers import OverlapPatchEmbed, BuildNorm, ConvStem, PatchDecompose, \
-    ConditionalPositionEncoding, SkipLayer, SegmentationHead, PatchCombined
+    SkipLayer, SegmentationHead, PatchCombined
 from utils.model_utils import calculate_flops_and_params
 
 
@@ -98,7 +98,6 @@ class L2GEncoder(nn.Layer):
         self.down_sample_list = nn.LayerList(
             [
                 PatchCombined(dim=stage_channels[i], merge_size=3, norm_layer=norm_type)
-                # PatchSplitSelectDown(channels=stage_channels[i], norm_type=norm_type)
                 if i != len(stage_channels) - 1 else nn.Identity()
                 for i in range(len(stage_channels))
             ]
@@ -158,7 +157,6 @@ class L2GDecoder(nn.Layer):
         )
         self.skip_layer_list = nn.LayerList(
             [
-                # ModSkip(stage_channels[self.stages - i - 1]) for i in range(self.stages)
                 SkipLayer(stage_channels[self.stages - i - 1]) for i in range(self.stages)
             ]
         )
@@ -189,7 +187,7 @@ class MSLBlock(nn.Layer):
         self.proj = nn.Conv2D(channels, channels, 1)
         self.proj_1 = nn.Conv2D(channels, channels, 1)
         self.proj_2 = nn.Conv2D(channels, channels, 1)
-        self.drop = nn.Dropout2D(attn_drop)
+        self.drop = nn.Dropout(attn_drop)
         self.mlp = Mlp(channels, channels * 4, channels, attn_drop, norm_type, act_type)
         # self.mlp = AMCMixer(channels, act_type)
 
@@ -240,7 +238,7 @@ class L2GBlock(nn.Layer):
         self.proj_4 = nn.Conv2D(scale_channels, scale_channels, 1)
         self.mod_xl = nn.Conv2D(scale_channels, scale_channels, 1)
         self.mod_xg = nn.Conv2D(scale_channels, scale_channels, 1)
-        self.drop = DropPath(drop_path_rate)
+        self.drop = nn.Dropout(drop_path_rate)
         self.mlp = Mlp(channels, channels * 4, channels, drop_path_rate, norm_type, act_type)
         # self.mlp = AMCMixer(channels, act_type)
 
@@ -379,8 +377,7 @@ class FocusedLinearAttention(nn.Layer):
             # BuildNorm(dim, norm_type),
             # nn.Conv2D(dim, dim, 1)
         )
-        self.cpe = ConditionalPositionEncoding(dim, 3)
-        self.attn_drop = DropPath(attn_drop)
+        self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Conv2D(dim, dim, 1)
         self.proj_drop = DropPath(proj_drop)
         self.focusing_factor = focusing_factor
@@ -388,7 +385,6 @@ class FocusedLinearAttention(nn.Layer):
         self.scale = paddle.static.create_parameter([1, 1, dim], dtype='float32')
 
     def forward(self, x, Q, pre_attn):
-        # x = self.cpe(x)
         residual = x
         B, C, H, W = x.shape
         q = self.q_down(Q)

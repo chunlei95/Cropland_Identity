@@ -283,7 +283,7 @@ class Mlp(nn.Layer):
         self.conv1 = nn.Conv2D(in_channels, hidden_channels, 1, 1)
         self.act = act_type()
         self.conv2 = nn.Conv2D(hidden_channels, out_channels, 1, 1)
-        self.drop = nn.Dropout(drop_rate)
+        self.drop = nn.Dropout2D(drop_rate)
 
     def forward(self, x):
         x = self.norm(x)

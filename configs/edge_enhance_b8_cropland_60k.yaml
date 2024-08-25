@@ -1,4 +1,6 @@
-batch_size: 16
+_base_: './_base_/dataset/cropland.yaml'
+
+batch_size: 8
 iters: 40000
 
 train_dataset:
@@ -12,7 +14,7 @@ train_dataset:
       max_scale_factor: 2.0
       scale_step_size: 0.25
     - type: RandomPaddingCrop
-      crop_size: [224, 224]
+      crop_size: [ 256, 256 ]
     - type: RandomHorizontalFlip
     - type: RandomDistort
       brightness_range: 0.4
@@ -22,18 +24,26 @@ train_dataset:
     - type: RandomNoise
     - type: Normalize
   mode: train
+  edge: True
 
-val_dataset:
-  type: CroplandDataset
-  dataset_root: D:/datasets/Cropland_Identity/new_data/data_source
-  img_dir: images
-  ann_dir: labels
-  transforms:
-    - type: Normalize
-  mode: val
-
+model:
+  type: EdgeEnhanceModel
+  seg_model:
+    type: SegNeXt
+    backbone:
+      type: MSCAN_L
+      pretrained: https://paddleseg.bj.bcebos.com/dygraph/backbone/mscan_l_imagenet_pretrained.zip
+    num_classes: 2
+    decoder_cfg:
+      channels: 256
+      ham_channels: 256
+      ham_kwargs:
+        MD_R: 16
+      dropout_rate: 0.1
+      align_corners: False
 
 optimizer:
+  _inherited_: False
   type: AdamW
   weight_decay: 0.01
 
@@ -43,7 +53,8 @@ lr_scheduler:
   warmup_start_lr: 1.0e-6
   learning_rate: 0.00006
   end_lr: 0.0
-  power: 0.9
+  power: 1.0
+
 
 loss:
   types:
@@ -51,5 +62,7 @@ loss:
       losses:
         - type: CrossEntropyLoss
         - type: DiceLoss
-      coef: [1, 1]
-  coef: [1]
+      coef: [ 1, 1 ]
+    - type: BCELoss
+      edge_label: True
+  coef: [ 1, 1 ]

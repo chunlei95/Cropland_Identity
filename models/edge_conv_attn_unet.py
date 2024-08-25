@@ -2,11 +2,13 @@ import math
 
 import paddle
 import paddle.nn as nn
+import paddle.nn.functional as F
+import paddleseg.transforms.functional as tf
 from paddleseg.cvlibs import manager
 
 from models.layers.layers import PatchCombined, OverlapPatchEmbed, \
     ConvStem, SegmentationHead, BuildNorm, ConditionalPositionEncoding, \
-    SkipLayer, PatchDecompose, SegmentationHead_Semi, Mlp
+    SkipLayer, PatchDecompose
 
 
 # noinspection PyProtectedMember,PyMethodMayBeStatic
@@ -79,10 +81,10 @@ class BasicBlock(nn.Layer):
                                                   dilations=dilations,
                                                   drop_rate=drop_rate)] * conv_attn_num)
         self.proj = nn.Conv2D(in_channels=channels, out_channels=channels, kernel_size=1)
-        self.mlp = Mlp(in_channels=channels,
-                       hidden_channels=channels * 4,
-                       drop_rate=drop_rate,
-                       norm_type=norm_type)
+        # self.mlp = Mlp(in_channels=channels,
+        #                hidden_channels=channels * 4,
+        #                drop_rate=drop_rate,
+        #                norm_type=norm_type)
 
     def forward(self, x):
         x = self.cpe(x)
@@ -94,9 +96,9 @@ class BasicBlock(nn.Layer):
         x = self.proj(x)
         x = x + residual
 
-        residual = x
-        x = self.mlp(x)
-        x = x + residual
+        # residual = x
+        # x = self.mlp(x)
+        # x = x + residual
         return x
 
 
@@ -126,9 +128,78 @@ class BasicLayer(nn.Layer):
         return x
 
 
+class EdgeModule(nn.Layer):
+    def __init__(self, branch_in_channels, norm_type, act_type):
+        super().__init__()
+        self.b1_conv_1 = nn.Sequential(
+            nn.Conv2D(in_channels=branch_in_channels[2],
+                      out_channels=branch_in_channels[1],
+                      kernel_size=3,
+                      padding=1),
+            BuildNorm(branch_in_channels[1], norm_type),
+            act_type()
+        )
+        self.b1_conv_2 = nn.Sequential(
+            nn.Conv2D(in_channels=branch_in_channels[1],
+                      out_channels=branch_in_channels[0],
+                      kernel_size=3,
+                      padding=1),
+            BuildNorm(branch_in_channels[0], norm_type),
+            act_type()
+        )
+        self.b2_conv_1 = nn.Sequential(
+            nn.Conv2D(in_channels=branch_in_channels[1],
+                      out_channels=branch_in_channels[1],
+                      kernel_size=3,
+                      padding=1),
+            BuildNorm(branch_in_channels[1], norm_type),
+            act_type()
+        )
+        self.b2_conv_2 = nn.Sequential(
+            nn.Conv2D(in_channels=branch_in_channels[1],
+                      out_channels=branch_in_channels[0],
+                      kernel_size=3,
+                      padding=1),
+            BuildNorm(branch_in_channels[0], norm_type),
+            act_type()
+        )
+        self.b3_conv_1 = nn.Sequential(
+            nn.Conv2D(in_channels=branch_in_channels[0],
+                      out_channels=branch_in_channels[0],
+                      kernel_size=3,
+                      padding=1),
+            BuildNorm(branch_in_channels[0], norm_type),
+            act_type()
+        )
+        self.b3_conv_2 = nn.Sequential(
+            nn.Conv2D(in_channels=branch_in_channels[0],
+                      out_channels=branch_in_channels[0],
+                      kernel_size=3,
+                      padding=1)
+        )
+
+    def forward(self, branch_in):
+        x1, x2, x3 = branch_in[:3]
+        x3 = self.b1_conv_1(x3)
+        x2 = self.b2_conv_1(x2)
+        x1 = self.b3_conv_1(x1)
+
+        x3 = F.interpolate(x3, x2.shape[2:], mode='bilinear', align_corners=True)
+        x2 = x2 + x3
+
+        x3 = self.b1_conv_2(x3)
+        x3 = F.interpolate(x3, x1.shape[2:], mode='bilinear', align_corners=True)
+        x2 = self.b2_conv_2(x2)
+        x2 = F.interpolate(x2, x1.shape[2:], mode='bilinear', align_corners=True)
+
+        x1 = x1 + x2 + x3
+        x1 = self.b3_conv_2(x1)
+        return x1
+
+
 # noinspection PyDefaultArgument
 @manager.MODELS.add_component
-class ConvAttnUNet(nn.Layer):
+class EdgeConvAttnUNet(nn.Layer):
 
     # noinspection PyTypeChecker
     def __init__(self,
@@ -234,17 +305,25 @@ class ConvAttnUNet(nn.Layer):
         skip_connections.reverse()
         self.stage_expand.extend(patch_expands)
         self.skip_layers.extend(skip_connections)
+        self.edge_module = EdgeModule(branch_in_channels=stage_out_channels[:3],
+                                      norm_type=norm_type,
+                                      act_type=act_type)
 
     def forward(self, x):
+        H, W = x.shape[2:]
         skip_features = []
         x = self.conv_stem(x)
         x = self.patch_embed(x)
+        branch_in = []
         for encoder_layers, merge_layer in zip(self.stage_encoder_layers, self.stage_merge):
             x = encoder_layers(x)
+            branch_in.append(x)
             # x的形状为B, C, H, W
             skip_features.append(x)
             x = merge_layer(x)
 
+        # x_edge = self.edge_module(branch_in)
+        # final_edge = F.interpolate(x_edge, [H, W], mode='bilinear', align_corners=True)
         encoder_out = x
 
         skip_features.reverse()
@@ -257,16 +336,18 @@ class ConvAttnUNet(nn.Layer):
             if type(skip_layer) is not nn.Identity:
                 x = skip_layer(x, skip_x)
             x = decoder_layers(x)
+        # x = x + x_edge
         x = self.final_expand(x)
         x = self.segmentation_head(x)
+        edge = tf.mask_to_binary_edge(x, radius=2, num_classes=self.num_classes)
         if self.semi_train:
             return encoder_out, [x]
         else:
-            return [x]
+            return [x, edge]
 
 
 if __name__ == '__main__':
-    net = ConvAttnUNet(norm_type=nn.LayerNorm)
+    net = EdgeConvAttnUNet(norm_type=nn.LayerNorm)
     print(net)
     x = paddle.randn((2, 1, 224, 224))
     out = net(x)

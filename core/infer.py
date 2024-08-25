@@ -78,7 +78,7 @@ def tensor_flip(x, flip):
     return x
 
 
-def slide_inference(model, im, crop_size, stride):
+def slide_inference(model, im, crop_size, stride, edge=False):
     """
     Infer by sliding window.
 
@@ -112,7 +112,7 @@ def slide_inference(model, im, crop_size, stride):
             h1 = max(h2 - h_crop, 0)
             w1 = max(w2 - w_crop, 0)
             im_crop = im[:, :, h1:h2, w1:w2]
-            _, logits = model(im_crop)
+            logits = model(im_crop)
             if not isinstance(logits, collections.abc.Sequence):
                 raise TypeError(
                     "The type of logits must be one of collections.abc.Sequence, e.g. list, tuple. But received {}"
@@ -136,7 +136,8 @@ def inference(model,
               trans_info=None,
               is_slide=False,
               stride=None,
-              crop_size=None):
+              crop_size=None,
+              edge=False):
     """
     Inference for image.
 
@@ -162,9 +163,60 @@ def inference(model,
                 .format(type(logits)))
         logit = logits[0]
     else:
-        logit = slide_inference(model, im, crop_size=crop_size, stride=stride)
+        logit = slide_inference(model, im, crop_size=crop_size, stride=stride, edge=edge)
     if hasattr(model, 'data_format') and model.data_format == 'NHWC':
         logit = logit.transpose((0, 3, 1, 2))
+    if trans_info is not None:
+        logit = reverse_transform(logit, trans_info, mode='bilinear')
+        pred = paddle.argmax(logit, axis=1, keepdim=True, dtype='int32')
+        return pred, logit
+    else:
+        return logit
+
+
+def multi_model_inference(model_list,
+                          im,
+                          model_weight=None,
+                          trans_info=None,
+                          is_slide=False,
+                          stride=None,
+                          crop_size=None):
+    """
+    Inference for image.
+
+    Args:
+        model (paddle.nn.Layer): model to get logits of image.
+        im (Tensor): the input image.
+        trans_info (list): Image shape informating changed process. Default: None.
+        is_slide (bool): Whether to infer by sliding window. Default: False.
+        crop_size (tuple|list). The size of sliding window, (w, h). It should be probided if is_slide is True.
+        stride (tuple|list). The size of stride, (w, h). It should be probided if is_slide is True.
+
+    Returns:
+        Tensor: If ori_shape is not None, a prediction with shape (1, 1, h, w) is returned.
+            If ori_shape is None, a logit with shape (1, num_classes, h, w) is returned.
+    """
+    logit_list = []
+    if model_weight is None:
+        model_weight = [1] * len(model_list)
+    assert sum(model_weight) == float(len(model_list))
+    for model, weight in zip(model_list, model_weight):
+        model.eval()
+        if hasattr(model, 'data_format') and model.data_format == 'NHWC':
+            im = im.transpose((0, 2, 3, 1))
+        if not is_slide:
+            logits = model(im)
+            if not isinstance(logits, collections.abc.Sequence):
+                raise TypeError(
+                    "The type of logits must be one of collections.abc.Sequence, e.g. list, tuple. But received {}"
+                    .format(type(logits)))
+            logit = logits[0]
+        else:
+            logit = slide_inference(model, im, crop_size=crop_size, stride=stride)
+        if hasattr(model, 'data_format') and model.data_format == 'NHWC':
+            logit = logit.transpose((0, 3, 1, 2))
+        logit_list.append(logit * weight)
+    logit = paddle.add_n(logit_list) / len(model_list)
     if trans_info is not None:
         logit = reverse_transform(logit, trans_info, mode='bilinear')
         pred = paddle.argmax(logit, axis=1, keepdim=True, dtype='int32')

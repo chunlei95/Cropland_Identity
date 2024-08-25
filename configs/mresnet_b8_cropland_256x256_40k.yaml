@@ -9,7 +9,7 @@ model:
   num_classes: 2
   patch_size: 3
   stage_channels: [ 96, 192, 384, 768 ]
-  encoder_depth: [ 2, 2, 2, 2 ] # 调到3很差劲
+  encoder_depth: [ 2, 2, 18, 2 ] # 调到3很差劲
   decoder_depth: [ 2, 2, 2 ] # 调到3很差劲
 #  stage_kernels: [ 3, 3, 3, 3 ]
   drop_rate: 0.5
@@ -26,6 +26,6 @@ lr_scheduler:
   type: PolynomialDecay
   warmup_iters: 1500
   warmup_start_lr: 1.0e-6
-  learning_rate: 0.0001
+  learning_rate: 0.00006
   end_lr: 0.0
   power: 1.0

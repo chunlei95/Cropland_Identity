@@ -18,10 +18,11 @@ def parse_args():
 
     # params of prediction
     parser.add_argument(
-        "--config", dest="cfg", help="The config file.", default=None, type=str)
+        "--config", dest="cfg", nargs='+', help="The config file.", default=None, type=str)
     parser.add_argument(
         '--model_path',
         dest='model_path',
+        nargs='+',
         help='The path of model for prediction',
         type=str,
         default=None)
@@ -145,14 +146,21 @@ def main(args):
     if not args.cfg:
         raise RuntimeError('No configuration file specified.')
 
-    cfg = Config(args.cfg)
+    models = []
+    if len(args.cfg) > 1:
+        for c in args.cfg:
+            cfg = Config(c)
+            models.append(cfg.model)
+    else:
+        cfg = Config(args.cfg[0])
+        models = cfg.model
 
     msg = '\n---------------Config Information---------------\n'
     msg += str(cfg)
     msg += '------------------------------------------------'
     logger.info(msg)
 
-    model = cfg.model
+    # model = cfg.model
     transforms = Compose(cfg.val_transforms)
     image_list, image_dir = get_image_list(args.image_path)
     logger.info('Number of predict images = {}'.format(len(image_list)))
@@ -160,7 +168,7 @@ def main(args):
     test_config = get_test_config(cfg, args)
 
     predict(
-        model,
+        models,
         model_path=args.model_path,
         transforms=transforms,
         image_list=image_list,

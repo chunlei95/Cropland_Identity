@@ -1,0 +1,42 @@
+_base_: './_base_/dataset/cropland.yaml'
+
+batch_size: 8
+iters: 60000
+
+model:
+  type: SwinUNet
+  backbone:
+    type: SwinTransformer_large_patch4_window7_224
+    in_chans: 3
+    class_num: 2
+    pretrained: True
+  img_size: 224
+  patch_size: 4
+  window_size: 7
+  in_chans: 3
+  num_classes: 2
+  pretrained: https://paddleseg.bj.bcebos.com/paddleseg3d/synapse/abdomen/swinunet_abdomen_224_224_1_14k_5e-2/swinunet_pretrained.zip
+
+#optimizer:
+#  type: sgd
+#  momentum: 0.9
+#  weight_decay: 1.0e-4
+#
+#lr_scheduler:
+#  type: PolynomialDecay
+#  learning_rate: 0.01
+#  end_lr: 0
+#  power: 0.9
+
+optimizer:
+  _inherited_: False
+  type: AdamW
+  weight_decay: 0.01
+
+lr_scheduler:
+  type: PolynomialDecay
+  warmup_iters: 1500
+  warmup_start_lr: 1.0e-6
+  learning_rate: 0.00006
+  end_lr: 0.0
+  power: 1.0

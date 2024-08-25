@@ -4,19 +4,15 @@ batch_size: 8
 iters: 60000
 
 model:
-  type: LGGFormer
-  in_channels: 3
+  type: UNetFormer
+  backbone:
+    type: ResNet18_vd
+    in_channels: 3
+#    pretrained: True
+  decode_channels: 64
+  dropout: 0.1
+  window_size: 8
   num_classes: 2
-  patch_size: 3
-  stage_channels: [96, 192, 384, 768]
-  encoder_stage_blocks: [2, 2, 2, 2]
-  decoder_stage_blocks: [2, 2, 2]
-  num_heads: [2, 4, 8, 16]
-  trans_layers: 2
-  attn_drop: 0.5
-  drop_path_rate: 0.5
-  norm_type: nn.LayerNorm
-  act_type: nn.GELU
 
 optimizer:
   _inherited_: False

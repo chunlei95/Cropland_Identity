@@ -12,25 +12,31 @@ model:
   merge_size: 3
   encode_size: 3
   stage_out_channels: [ 96, 192, 384, 768 ]
-  depths: [ 2, 2, 2, 1 ]
+  depths: [ 2, 2, 2, 2 ]
   local_kernel_sizes: [ 3, 3, 3, 3 ]
-  attn_kernel_sizes: [ [ 7, 9, 11 ],
-                       [ 7, 9, 11 ],
-                       [ 7, 9, 11 ],
-                       [ 7, 9, 11 ] ]
+  attn_kernel_sizes: [ [ 7, 13, 21 ],
+                       [ 7, 13, 21 ],
+                       [ 5, 7, 9 ],
+                       [ 5, 7, 9 ] ]
   dilations: [ [ 3, 3, 3 ],
                [ 3, 3, 3 ],
                [ 3, 3, 3 ],
                [ 3, 3, 3 ] ]
-  drop_rate: 0.5
+  drop_rate: 0.2
   conv_attn_num: 1
   norm_type: nn.LayerNorm
   act_type: nn.GELU
 
 optimizer:
   _inherited_: False
-  type: AdamW
-  weight_decay: 0.01
+  type: Adam
+  weight_decay: 4.0e-5
+#  custom_cfg:
+#    - name: backbone
+#      lr_mult: 0.1
+#    - name: norm
+#      weight_decay_mult: 0.0
+#  weight_decay: 0.01
 
 lr_scheduler:
   type: PolynomialDecay

@@ -1,6 +1,6 @@
 _base_: './_base_/dataset/cropland.yaml'
 
-batch_size: 2
+batch_size: 4
 iters: 80000
 num_classes: 2
 thresh_init: 0.85
@@ -8,9 +8,9 @@ thresh_init: 0.85
 
 train_dataset:
   type: CroplandDataset
-  dataset_root: D:/datasets/Cropland_Identity/Cropland_Identity_256
-  img_dir: img_dir/train_labeled
-  ann_dir: ann_dir/train_labeled
+  dataset_root: D:/datasets/Cropland_Identity/new_data/data_source
+  img_dir: images
+  ann_dir: labels
   transforms:
     - type: ResizeStepScaling
       min_scale_factor: 0.5
@@ -34,8 +34,8 @@ train_dataset:
 
 unlabeled_train_dataset:
   type: CroplandDataset
-  dataset_root: D:/datasets/Cropland_Identity/Cropland_Identity_256
-  img_dir: img_dir/train_unlabeled
+  dataset_root: D:/datasets/Cropland_Identity/new_data/data_source
+  img_dir: train_unlabeled
   transforms:
     - type: ResizeStepScaling
       min_scale_factor: 0.5
@@ -86,7 +86,7 @@ model:
   in_channels: 768
   corr_channels: 96
   num_classes: 2
-  drop_rate: 0.1
+  drop_rate: 0.2
   norm_type: nn.LayerNorm
   act_type: nn.GELU
 
@@ -99,7 +99,7 @@ lr_scheduler:
   type: PolynomialDecay
   warmup_iters: 1500
   warmup_start_lr: 1.0e-6
-  learning_rate: 0.0001
+  learning_rate: 0.00006
   end_lr: 0.0
   power: 1.0
 

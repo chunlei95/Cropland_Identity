@@ -22,6 +22,7 @@ def parse_args():
         '--pretrained_path',
         dest='pretrained_path',
         type=str,
+        default=None,
         help='The model params path pretrained on the labeled dataset'
     )
     parser.add_argument(
@@ -216,6 +217,10 @@ def main(args):
     if place == 'gpu' and paddle.distributed.ParallelEnv().nranks > 1:
         # convert bn to sync_bn
         cfg._model = paddle.nn.SyncBatchNorm.convert_sync_batchnorm(cfg.model)
+
+    if args.pretrained_path is not None:
+        pretrained = paddle.load(args.pretrained_path)
+        cfg.model.backbone.set_state_dict(pretrained)
 
     train_semi(
         cfg.model,
