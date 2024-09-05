@@ -1,20 +1,3 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserve.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""
-This file refers to https://github.com/hustvl/TopFormer and https://github.com/BR-IDL/PaddleViT
-"""
-
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -22,8 +5,6 @@ from paddle.nn.initializer import Constant
 from paddleseg import utils
 from paddleseg.cvlibs import manager
 from paddleseg.models.backbones.transformer_utils import Identity, DropPath
-
-__all__ = ["TopTransformer_Base", "TopTransformer_Small", "TopTransformer_Tiny"]
 
 
 def make_divisible(val, divisor, min_value=None):
@@ -647,7 +628,7 @@ class TopTransformer(nn.Layer):
         super().__init__()
         self.feat_channels = [
             c[2] for i, c in enumerate(cfgs) if i in encoder_out_indices
-        ]
+        ] if tpm is None else tpm.feat_channels
         self.injection_out_channels = injection_out_channels
         self.injection = injection
         self.embed_dim = sum(self.feat_channels)
@@ -660,8 +641,7 @@ class TopTransformer(nn.Layer):
             lr_mult=lr_mult) if tpm is None else tpm
         self.ppa = PyramidPoolAgg(stride=c2t_stride)
 
-        dpr = [x.item() for x in \
-               paddle.linspace(0, drop_path_rate, depths)]
+        dpr = [x.item() for x in paddle.linspace(0, drop_path_rate, depths)]
         self.trans = BasicLayer(
             block_num=depths,
             embedding_dim=self.embed_dim,
@@ -851,6 +831,26 @@ def TopTransformer_Large(**kwargs):
         injection=True,
         **kwargs)
     return model
+
+
+@manager.MODELS.add_component
+class VANTopFormer(nn.Layer):
+    def __init__(self,
+                 backbone,
+                 head,
+                 align_corners):
+        super().__init__()
+        self.backbone = backbone
+        self.decode_head = head
+        self.align_corners = align_corners
+
+    def forward(self, x):
+        x_hw = paddle.shape(x)[2:]
+        x = self.backbone(x)  # len=3, 1/8,1/16,1/32
+        x = self.decode_head(x)
+        x = F.interpolate(
+            x, x_hw, mode='bilinear', align_corners=self.align_corners)
+        return [x]
 
 
 if __name__ == '__main__':

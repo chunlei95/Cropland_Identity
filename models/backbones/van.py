@@ -196,6 +196,7 @@ class VAN(nn.Layer):
         super().__init__()
         self.depths = depths
         self.num_stages = num_stages
+        self.feat_channels = embed_dims
 
         dpr = [x for x in paddle.linspace(0, drop_path_rate, sum(depths))
                ]  # stochastic depth decay rule

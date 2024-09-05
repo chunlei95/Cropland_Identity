@@ -8,12 +8,10 @@ from paddleseg.utils import get_sys_env, logger
 from core import train
 from cvlibs.config import Config
 from datasets import CroplandDataset
-from models import ConvAttnUNet, RMMedNet, LGGFormer, EdgeConvAttnUNet, EfficientPyramidMamba, PyramidMamba, UNetFormer, \
-    EdgeEnhanceModel, VAN, TopTransformer, TopTransformer_Base, TopTransformer_Large
+from models import ConvAttnUNet, EfficientPyramidMamba, PyramidMamba, UNetFormer, VAN, TopTransformer, TopTransformer_Base, TopTransformer_Large, VANTopFormer
 
-__all__ = ['CroplandDataset', 'ConvAttnUNet', 'RMMedNet', 'LGGFormer', 'EdgeConvAttnUNet', 'EfficientPyramidMamba',
-           'PyramidMamba', 'UNetFormer', 'EdgeEnhanceModel', 'VAN', 'TopTransformer', 'TopTransformer_Base',
-           'TopTransformer_Large']
+__all__ = ['CroplandDataset', 'ConvAttnUNet', 'EfficientPyramidMamba', 'PyramidMamba', 'UNetFormer', 'VAN', 'TopTransformer', 'TopTransformer_Base',
+           'TopTransformer_Large', 'VANTopFormer']
 
 
 def parse_args():

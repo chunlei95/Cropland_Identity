@@ -1,17 +1,17 @@
 import argparse
 import ast
+
 import paddle
-from paddleseg.transforms import Compose
 from paddleseg.utils import get_sys_env, logger
 
 from core.predict import predict
 from cvlibs.config import Config
 from datasets import CroplandDataset
 from datasets.transforms.transforms import GeoCompose
-from models import ConvAttnUNet, RMMedNet
+from models import ConvAttnUNet, VANTopFormer, VAN, TopTransformer
 from utils.utils import get_image_list
 
-__all__ = ['CroplandDataset', 'ConvAttnUNet', 'RMMedNet']
+__all__ = ['CroplandDataset', 'ConvAttnUNet', 'VAN', 'VANTopFormer', 'TopTransformer']
 
 
 def parse_args():
