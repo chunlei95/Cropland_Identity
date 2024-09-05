@@ -79,10 +79,10 @@ class BasicBlock(nn.Layer):
                                                   dilations=dilations,
                                                   drop_rate=drop_rate)] * conv_attn_num)
         self.proj = nn.Conv2D(in_channels=channels, out_channels=channels, kernel_size=1)
-        self.mlp = Mlp(in_channels=channels,
-                       hidden_channels=channels * 4,
-                       drop_rate=drop_rate,
-                       norm_type=norm_type)
+        # self.mlp = Mlp(in_channels=channels,
+        #                hidden_channels=channels * 4,
+        #                drop_rate=drop_rate,
+        #                norm_type=norm_type)
 
     def forward(self, x):
         x = self.cpe(x)
@@ -94,9 +94,9 @@ class BasicBlock(nn.Layer):
         x = self.proj(x)
         x = x + residual
 
-        residual = x
-        x = self.mlp(x)
-        x = x + residual
+        # residual = x
+        # x = self.mlp(x)
+        # x = x + residual
         return x
 
 

@@ -12,6 +12,8 @@ import paddleseg.transforms.functional as F
 from paddleseg.cvlibs import manager
 from paddleseg.transforms import Compose
 
+from datasets.transforms.transforms import GeoCompose
+
 
 @manager.DATASETS.add_component
 class CroplandDataset(paddle.io.Dataset):
@@ -35,7 +37,7 @@ class CroplandDataset(paddle.io.Dataset):
         super().__init__()
         self.dataset_root = dataset_root
 
-        self.transforms = Compose(transforms)
+        self.transforms = GeoCompose(transforms)
 
         # 半监督专用
         self.strong_transforms = strong_transforms
@@ -73,9 +75,9 @@ class CroplandDataset(paddle.io.Dataset):
             image_paths.sort()
             grt_paths.sort()
 
-            np.random.seed(1024)
+            np.random.seed(585)
             np.random.shuffle(image_paths)
-            np.random.seed(1024)
+            np.random.seed(585)
             np.random.shuffle(grt_paths)
             file_len = len(image_paths)
             val_len = math.ceil(file_len * test_ratio)

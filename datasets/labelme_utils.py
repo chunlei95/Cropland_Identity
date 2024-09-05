@@ -6,7 +6,6 @@ import os.path as osp
 
 import imgviz
 import PIL.Image
-import tifffile
 
 from labelme import utils
 from labelme.logger import logger

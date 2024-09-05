@@ -1,4 +1,4 @@
-batch_size: 16
+batch_size: 4
 iters: 40000
 
 train_dataset:
@@ -6,13 +6,14 @@ train_dataset:
   dataset_root: D:/datasets/Cropland_Identity/new_data/data_source
   img_dir: images
   ann_dir: labels
+  test_ratio: 0.3
   transforms:
     - type: ResizeStepScaling
       min_scale_factor: 0.5
       max_scale_factor: 2.0
       scale_step_size: 0.25
     - type: RandomPaddingCrop
-      crop_size: [224, 224]
+      crop_size: [256, 256]
     - type: RandomHorizontalFlip
     - type: RandomDistort
       brightness_range: 0.4
@@ -28,6 +29,7 @@ val_dataset:
   dataset_root: D:/datasets/Cropland_Identity/new_data/data_source
   img_dir: images
   ann_dir: labels
+  test_ratio: 0.3
   transforms:
     - type: Normalize
   mode: val
@@ -41,15 +43,11 @@ lr_scheduler:
   type: PolynomialDecay
   warmup_iters: 1500
   warmup_start_lr: 1.0e-6
-  learning_rate: 0.00006
+  learning_rate: 0.0008
   end_lr: 0.0
   power: 0.9
 
 loss:
   types:
-    - type: MixedLoss
-      losses:
-        - type: CrossEntropyLoss
-        - type: DiceLoss
-      coef: [1, 1]
+    - type: CrossEntropyLoss
   coef: [1]

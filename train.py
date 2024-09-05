@@ -9,10 +9,11 @@ from core import train
 from cvlibs.config import Config
 from datasets import CroplandDataset
 from models import ConvAttnUNet, RMMedNet, LGGFormer, EdgeConvAttnUNet, EfficientPyramidMamba, PyramidMamba, UNetFormer, \
-    EdgeEnhanceModel, SwinUNet, SwinTransformer
+    EdgeEnhanceModel, VAN, TopTransformer, TopTransformer_Base, TopTransformer_Large
 
 __all__ = ['CroplandDataset', 'ConvAttnUNet', 'RMMedNet', 'LGGFormer', 'EdgeConvAttnUNet', 'EfficientPyramidMamba',
-           'PyramidMamba', 'UNetFormer', 'EdgeEnhanceModel', 'SwinUNet', 'SwinTransformer']
+           'PyramidMamba', 'UNetFormer', 'EdgeEnhanceModel', 'VAN', 'TopTransformer', 'TopTransformer_Base',
+           'TopTransformer_Large']
 
 
 def parse_args():

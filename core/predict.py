@@ -5,10 +5,14 @@ import cv2
 import numpy as np
 import paddle
 import paddle.nn.functional as F
+from PIL import Image
+from osgeo import gdal, ogr, osr
 from paddleseg import utils
-from paddleseg.utils import logger, progbar, visualize
+from paddleseg.utils import logger, progbar
 
 from core import infer
+from datasets.utils import pred_post_process
+from utils import visualize, geo_analyse
 
 
 def mkdir(path):
@@ -26,9 +30,16 @@ def partition_list(arr, m):
 def preprocess(im_path, transforms):
     data = {}
     data['img'] = im_path
+    if os.path.splitext(im_path)[-1] == '.tif':
+        tif_sc = gdal.Open(im_path)
+        projection = tif_sc.GetProjection()
+        geo_transform = tif_sc.GetGeoTransform()
+        data['projection'] = projection
+        data['geo_transform'] = geo_transform
     data = transforms(data)
     data['img'] = data['img'][np.newaxis, ...]
     data['img'] = paddle.to_tensor(data['img'])
+    # data['img_path'] = im_path
     return data
 
 
@@ -45,7 +56,10 @@ def predict(model,
             is_slide=False,
             stride=None,
             crop_size=None,
-            custom_color=None):
+            custom_color=None,
+            post_process=False,
+            clip_target=None,
+            conditions=None):
     """
     predict and visualize the image_list.
 
@@ -137,18 +151,31 @@ def predict(model,
             if im_file[0] == '/' or im_file[0] == '\\':
                 im_file = im_file[1:]
 
-            # save added image
-            added_image = utils.visualize.visualize(
-                im_path, pred, color_map, weight=0.6)
-            added_image_path = os.path.join(added_saved_dir, im_file)
-            mkdir(added_image_path)
-            cv2.imwrite(added_image_path, added_image)
-
             # save pseudo color prediction
-            pred_mask = utils.visualize.get_pseudo_color_map(pred, color_map)
+            pred_mask = visualize.get_pseudo_color_map(pred, color_map)
+            if post_process:
+                pred_mask = np.array(pred_mask, dtype=np.uint8)
+                pred_mask = pred_post_process(pred_mask)
+                pred_mask = Image.fromarray(pred_mask)
+
             pred_saved_path = os.path.join(
                 pred_saved_dir, os.path.splitext(im_file)[0] + ".png")
             mkdir(pred_saved_path)
             pred_mask.save(pred_saved_path)
+
+            # save added image
+            added_image = visualize.visualize(
+                im_path, pred_saved_path, color_map, weight=0.6)
+            added_image_path = os.path.join(added_saved_dir, im_file)
+            mkdir(added_image_path)
+            if os.path.splitext(added_image_path)[-1] == '.tif':
+                cv2.imencode('.tif', added_image)[1].tofile(added_image_path)
+            else:
+                cv2.imwrite(added_image_path, added_image)
+
+            pred_mask = np.array(pred_mask)
+            shp_path = os.path.join(pred_saved_dir, os.path.splitext(im_file)[0] + '.shp')
+            geo_analyse.ndarray2shp(pred_mask, shp_path, im_path, clip_target, conditions)
+            # geo_analyse.data_to_shp(pred_mask, im_path, shp_path=shp_path, clip_target=clip_target, conditions=conditions)
 
             progbar_pred.update(i + 1)

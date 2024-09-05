@@ -1,5 +1,5 @@
 import argparse
-
+import ast
 import paddle
 from paddleseg.transforms import Compose
 from paddleseg.utils import get_sys_env, logger
@@ -7,6 +7,7 @@ from paddleseg.utils import get_sys_env, logger
 from core.predict import predict
 from cvlibs.config import Config
 from datasets import CroplandDataset
+from datasets.transforms.transforms import GeoCompose
 from models import ConvAttnUNet, RMMedNet
 from utils.utils import get_image_list
 
@@ -38,6 +39,26 @@ def parse_args():
         help='The directory for saving the predicted results',
         type=str,
         default='./output/result')
+    parser.add_argument(
+        '--post_process',
+        dest='post_process',
+        action='store_true'
+    )
+
+    parser.add_argument(
+        '--clip_target',
+        dest='clip_target',
+        type=str,
+        default=None,
+        help='shapefile path used to get a polygon area'
+    )
+    parser.add_argument(
+        '--conditions',
+        dest='conditions',
+        type=ast.literal_eval,
+        default=None,
+        help='Conditions dict used to select polygon from clip_target'
+    )
 
     # augment for prediction
     parser.add_argument(
@@ -106,6 +127,8 @@ def parse_args():
 
 def get_test_config(cfg, args):
     test_config = cfg.test_config
+    if args.post_process:
+        test_config['post_process'] = args.post_process
     if 'aug_eval' in test_config:
         test_config.pop('aug_eval')
     if args.aug_pred:
@@ -125,6 +148,11 @@ def get_test_config(cfg, args):
 
     if args.custom_color:
         test_config['custom_color'] = args.custom_color
+
+    if args.clip_target is not None:
+        test_config['clip_target'] = args.clip_target
+        if args.conditions is not None:
+            test_config['conditions'] = args.conditions
 
     return test_config
 
@@ -161,12 +189,12 @@ def main(args):
     logger.info(msg)
 
     # model = cfg.model
-    transforms = Compose(cfg.val_transforms)
+    transforms = GeoCompose(cfg.val_transforms)
     image_list, image_dir = get_image_list(args.image_path)
     logger.info('Number of predict images = {}'.format(len(image_list)))
 
     test_config = get_test_config(cfg, args)
-
+    conditions = args.conditions
     predict(
         models,
         model_path=args.model_path,

@@ -1,0 +1,38 @@
+_base_: './_base_/dataset/cropland.yaml'
+
+batch_size: 8
+iters: 60000
+
+optimizer:
+  _inherited_: False
+  type: AdamW
+  weight_decay: 0.01
+
+lr_scheduler:
+  type: PolynomialDecay
+  learning_rate: 0.0006
+  end_lr: 0
+  power: 1.0
+  warmup_iters: 1500
+  warmup_start_lr: 1.0e-6
+
+loss:
+  types:
+    - type: CrossEntropyLoss
+  coef: [ 1 ]
+
+model:
+  type: TopFormer
+  num_classes: 2
+  backbone:
+    type: TopTransformer_Large
+    tpm:
+      type: VAN
+      img_size: 256
+      in_chans: 3
+      embed_dims: [ 64, 128, 256, 512 ]
+      mlp_ratios: [ 4, 4, 4, 4 ]
+      drop_rate: 0.2
+      drop_path_rate: 0.2
+      depths: [ 3, 3, 12, 3 ]
+      num_stages: 4

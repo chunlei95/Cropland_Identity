@@ -1,0 +1,10 @@
+paddlepaddle-gpu
+osgeo
+opencv
+paddleseg
+shapely
+geopandas
+labelme
+PIL
+imgviz
+tifffile

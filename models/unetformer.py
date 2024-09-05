@@ -191,16 +191,27 @@ class GlobalLocalAttention(nn.Layer):
         local = self.local2(x) + self.local1(x)
 
         x = self.pad(x, self.ws)
-        B, C, Hp, Wp = x.shape
+        B, _, Hp, Wp = x.shape
         qkv = self.qkv(x)
 
-        q, k, v = paddle.split(qkv, 3, axis=1)
-        q = paddle.flatten(q, 2).transpose((0, 2, 1)).reshape(
-            (B, Hp * Wp, C // self.num_heads, self.num_heads)).transpose((0, 3, 1, 2))
-        k = paddle.flatten(k, 2).transpose((0, 2, 1)).reshape(
-            (B, Hp * Wp, C // self.num_heads, self.num_heads)).transpose((0, 3, 1, 2))
-        v = paddle.flatten(v, 2).transpose((0, 2, 1)).reshape(
-            (B, Hp * Wp, C // self.num_heads, self.num_heads)).transpose((0, 3, 1, 2))
+        # q, k, v = paddle.split(qkv, 3, axis=1)
+        # q = paddle.flatten(q, 2).transpose((0, 2, 1)).reshape(
+        #     (B, Hp * Wp, C // self.num_heads, self.num_heads)).transpose((0, 3, 1, 2))
+        # k = paddle.flatten(k, 2).transpose((0, 2, 1)).reshape(
+        #     (B, Hp * Wp, C // self.num_heads, self.num_heads)).transpose((0, 3, 1, 2))
+        # v = paddle.flatten(v, 2).transpose((0, 2, 1)).reshape(
+        #     (B, Hp * Wp, C // self.num_heads, self.num_heads)).transpose((0, 3, 1, 2))
+        C = qkv.shape[1]
+        qkv = paddle.reshape(qkv, (B, C, H, self.ws, -1)).transpose((0, 1, 3, 4, 2))
+        qkv = paddle.reshape(qkv, (B, C, self.ws, Wp // self.ws, self.ws, Hp // self.ws))
+        qkv = paddle.transpose(qkv, (0, 3, 5, 2, 4, 1))
+        qkv = paddle.flatten(qkv, 0, 2)  # BW, ws, ws, C
+        qkv = paddle.flatten(qkv, 1, 2)  # BW, wsn, C
+        BW, WSN, C = qkv.shape
+        qkv = paddle.reshape(qkv, (BW, WSN, 3, C // 3)).transpose((2, 0, 1, 3))  # 3, BW, WSN, C // 3
+        q, k, v = paddle.reshape(qkv, (3, BW, WSN, self.num_heads, -1)).transpose((0, 1, 3, 2, 4))  # 3, BW, h, WSN, d
+        # q, k, v = paddle.flatten(qkv, 2).transpose((0, 2, 1)).reshape((B, -1, 3, C // 3))
+        # qkv = qkv.reshape((B, Hp * Wp, 3, self.num_heads, -1)).transpose()
 
         # q, k, v = rearrange(qkv, 'b (qkv h d) (hh ws1) (ww ws2) -> qkv (b hh ww) h (ws1 ws2) d', h=self.num_heads,
         #                     d=C // self.num_heads, hh=Hp // self.ws, ww=Wp // self.ws, qkv=3, ws1=self.ws, ws2=self.ws)
@@ -209,16 +220,25 @@ class GlobalLocalAttention(nn.Layer):
 
         if self.relative_pos_embedding:
             # pw, ph = self.relative_position_index.shape
-            relative_position_bias = self.relative_position_bias_table[self.relative_position_index.reshape((-1,))].reshape((
+            relative_position_bias = self.relative_position_bias_table[
+                self.relative_position_index.reshape((-1,))].reshape((
                 self.ws * self.ws, self.ws * self.ws, -1))  # Wh*Ww,Wh*Ww,nH
             relative_position_bias = relative_position_bias.transpose((2, 0, 1))  # nH, Wh*Ww, Wh*Ww
             dots += relative_position_bias.unsqueeze(0)
 
-        attn = dots.softmax(dim=-1)
+        # attn = dots.softmax(dim=-1)
+        attn = F.softmax(dots, axis=-1)
         attn = attn @ v  # b, h, n, d
 
         attn = paddle.transpose(attn, (0, 2, 1, 3)).flatten(2)  # b, n, c
-        attn = paddle.transpose(attn, (0, 2, 1)).reshape((B, C, Hp, Wp))
+        BW, WSN, C = attn.shape
+        attn = paddle.transpose(attn, (0, 2, 1)).reshape((BW, C, self.ws, self.ws))
+        attn = paddle.transpose(attn, (1, 2, 3, 0)).reshape((C, self.ws, self.ws, B, -1))
+        attn = paddle.transpose(attn, (3, 0, 1, 2, 4)).reshape((B, C, self.ws, self.ws, Wp // self.ws, Hp // self.ws))
+        attn = paddle.transpose(attn, (0, 1, 3, 5, 2, 4))
+        attn = paddle.flatten(attn, 2, 3)
+        attn = paddle.flatten(attn, 3, 4)
+        # attn = paddle.transpose(attn, (0, 2, 1)).reshape((B, C, Hp, Wp))
 
         # attn = rearrange(attn, '(b hh ww) h (ws1 ws2) d -> b (h d) (hh ws1) (ww ws2)', h=self.num_heads,
         #                  d=C // self.num_heads, hh=Hp // self.ws, ww=Wp // self.ws, ws1=self.ws, ws2=self.ws)

@@ -12,7 +12,7 @@ model:
   encoder_depth: [ 2, 2, 18, 2 ] # 调到3很差劲
   decoder_depth: [ 2, 2, 2 ] # 调到3很差劲
 #  stage_kernels: [ 3, 3, 3, 3 ]
-  drop_rate: 0.5
+  drop_rate: 0.2
   norm_type: nn.LayerNorm
   act_type: nn.GELU
 
@@ -26,6 +26,6 @@ lr_scheduler:
   type: PolynomialDecay
   warmup_iters: 1500
   warmup_start_lr: 1.0e-6
-  learning_rate: 0.00006
+  learning_rate: 0.0006
   end_lr: 0.0
   power: 1.0

@@ -1,6 +1,6 @@
 _base_: './_base_/dataset/cropland.yaml'
 
-batch_size: 4
+batch_size: 8
 iters: 80000
 num_classes: 2
 thresh_init: 0.85
@@ -11,6 +11,7 @@ train_dataset:
   dataset_root: D:/datasets/Cropland_Identity/new_data/data_source
   img_dir: images
   ann_dir: labels
+  test_ratio: 0.8
   transforms:
     - type: ResizeStepScaling
       min_scale_factor: 0.5
@@ -46,13 +47,13 @@ unlabeled_train_dataset:
     - type: RandomHorizontalFlip
   strong_transforms:
     - type: RandomDistort
-      brightness_range: 0.4
-      contrast_range: 0.4
-      saturation_range: 0.4
+      brightness_range: 0.6
+      contrast_range: 0.6
+      saturation_range: 0.6
     - type: RandomBlur
-      prob: 0.8
+      prob: 0.6
     - type: RandomNoise
-      prob: 0.8
+      prob: 0.6
   latest_transforms:
     - type: Normalize
   mode: train_unlabeled
@@ -70,10 +71,10 @@ model:
     stage_out_channels: [ 96, 192, 384, 768 ]
     depths: [ 2, 2, 2, 1 ]
     local_kernel_sizes: [ 3, 3, 3, 3 ]
-    attn_kernel_sizes: [ [ 7, 9, 11 ],
-                         [ 7, 9, 11 ],
-                         [ 7, 9, 11 ],
-                         [ 7, 9, 11 ] ]
+    attn_kernel_sizes: [ [ 7, 13, 21 ],
+                         [ 7, 13, 21 ],
+                         [ 7, 13, 21 ],
+                         [ 7, 13, 21 ] ]
     dilations: [ [ 3, 3, 3 ],
                  [ 3, 3, 3 ],
                  [ 3, 3, 3 ],
@@ -84,7 +85,7 @@ model:
     act_type: nn.GELU
     semi_train: True
   in_channels: 768
-  corr_channels: 96
+  corr_channels: 768
   num_classes: 2
   drop_rate: 0.2
   norm_type: nn.LayerNorm
@@ -99,7 +100,7 @@ lr_scheduler:
   type: PolynomialDecay
   warmup_iters: 1500
   warmup_start_lr: 1.0e-6
-  learning_rate: 0.00006
+  learning_rate: 0.0008
   end_lr: 0.0
   power: 1.0
 
