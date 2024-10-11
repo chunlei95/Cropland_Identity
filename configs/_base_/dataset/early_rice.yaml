@@ -29,7 +29,7 @@ val_dataset:
   dataset_root: D:/datasets/Cropland_Identity/new_data/data_source
   img_dir: images
   ann_dir: labels
-  test_ratio: 0.2
+  test_ratio: 0.3
   transforms:
     - type: Normalize
   mode: val

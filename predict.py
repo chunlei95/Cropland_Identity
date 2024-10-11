@@ -6,12 +6,16 @@ from paddleseg.utils import get_sys_env, logger
 
 from core.predict import predict
 from cvlibs.config import Config
-from datasets import CroplandDataset
+from datasets import CroplandDataset, LateRiceDataset
+from datasets.transforms import MultiSpectralCompose, MultiSpectralToTensor, MultiSpectralNormalize, \
+    MultiSpectralMinMaxScale
 from datasets.transforms.transforms import GeoCompose
-from models import ConvAttnUNet, VANTopFormer, VAN, TopTransformer
+from models import ConvAttnUNet, VANTopFormer, VAN, TopTransformer, TopFormerHead
 from utils.utils import get_image_list
 
-__all__ = ['CroplandDataset', 'ConvAttnUNet', 'VAN', 'VANTopFormer', 'TopTransformer']
+__all__ = ['CroplandDataset', 'ConvAttnUNet', 'VAN', 'VANTopFormer', 'TopTransformer', 'TopFormerHead',
+           'LateRiceDataset', 'MultiSpectralNormalize', 'MultiSpectralToTensor', 'MultiSpectralMinMaxScale',
+           'MultiSpectralCompose']
 
 
 def parse_args():
@@ -194,7 +198,6 @@ def main(args):
     logger.info('Number of predict images = {}'.format(len(image_list)))
 
     test_config = get_test_config(cfg, args)
-    conditions = args.conditions
     predict(
         models,
         model_path=args.model_path,

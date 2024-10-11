@@ -7,6 +7,7 @@ from paddleseg.cvlibs import manager
 from models.layers.layers import PatchCombined, OverlapPatchEmbed, \
     ConvStem, SegmentationHead, BuildNorm, ConditionalPositionEncoding, \
     SkipLayer, PatchDecompose, SegmentationHead_Semi, Mlp
+import paddle.nn.functional as F
 
 
 # noinspection PyProtectedMember,PyMethodMayBeStatic
@@ -236,6 +237,7 @@ class ConvAttnUNet(nn.Layer):
         self.skip_layers.extend(skip_connections)
 
     def forward(self, x):
+        ori_shape = x.shape[2:]
         skip_features = []
         x = self.conv_stem(x)
         x = self.patch_embed(x)
@@ -259,6 +261,9 @@ class ConvAttnUNet(nn.Layer):
             x = decoder_layers(x)
         x = self.final_expand(x)
         x = self.segmentation_head(x)
+        shape_x = x.shape[2:]
+        if shape_x[0] != ori_shape[0] or shape_x[1] != ori_shape[1]:
+            x = F.interpolate(x, ori_shape)
         if self.semi_train:
             return encoder_out, [x]
         else:

@@ -1,7 +1,7 @@
-_base_: './_base_/dataset/cropland.yaml'
+_base_: './_base_/dataset/late_rice.yaml'
 
 batch_size: 8
-iters: 60000
+iters: 20000
 
 optimizer:
   _inherited_: False
@@ -16,19 +16,19 @@ lr_scheduler:
   warmup_iters: 1500
   warmup_start_lr: 1.0e-6
 
-loss:
-  types:
-    - type: CrossEntropyLoss
-  coef: [ 1 ]
-
 #loss:
 #  types:
-#    - type: MixedLoss
-#      losses:
-#        - type: CrossEntropyLoss
-#        - type: DiceLoss
-#      coef: [1, 1]
-#  coef: [1]
+#    - type: CrossEntropyLoss
+#  coef: [ 1 ]
+
+loss:
+  types:
+    - type: MixedLoss
+      losses:
+        - type: CrossEntropyLoss
+        - type: DiceLoss
+      coef: [1, 1]
+  coef: [1]
 
 model:
   type: VANTopFormer
@@ -68,19 +68,19 @@ model:
     attn_ratios: 2
     mlp_ratios: 2
     c2t_stride: 2
-    drop_path_rate: 0.2
+    drop_path_rate: 0.5
     injection: True
     lr_mult: 0.1
-    in_channels: 3
+    in_channels: 10
     tpm:
-      type: VAN_B3
+      type: VAN_B2
       pretrained: True
 #      img_size: 256
-#      in_chans: 3
+      in_chans: 10
 #      embed_dims: [ 64, 128, 320, 512 ]
 #      mlp_ratios: [ 8, 8, 4, 4 ]
       drop_rate: 0.2
-      drop_path_rate: 0.3
+      drop_path_rate: 0.5
 #      depths: [ 3, 3, 12, 3 ]
 #      num_stages: 4
   head:

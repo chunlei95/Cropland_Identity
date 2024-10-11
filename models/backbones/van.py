@@ -15,7 +15,9 @@ MODEL_URLS = {
     "VAN_B2":
         "https://paddle-imagenet-models-name.bj.bcebos.com/dygraph/VAN_B2_pretrained.pdparams",
     "VAN_B3":
-        "https://paddle-imagenet-models-name.bj.bcebos.com/dygraph/VAN_B3_pretrained.pdparams"
+        "https://paddle-imagenet-models-name.bj.bcebos.com/dygraph/VAN_B3_pretrained.pdparams",
+    "VAN_B5":
+        "https://paddle-imagenet-models-name.bj.bcebos.com/dygraph/VAN_B5_pretrained.pdparams"
 }
 
 __all__ = list(MODEL_URLS.keys())
@@ -335,4 +337,37 @@ def VAN_B3(pretrained=False, use_ssld=False, **kwargs):
                 **kwargs)
     _load_pretrained(
         pretrained, model, MODEL_URLS["VAN_B3"], use_ssld=use_ssld)
+    return model
+
+
+@manager.BACKBONES.add_component
+def VAN_B4(pretrained=False, use_ssld=False, **kwargs):
+    model = VAN(embed_dims=[64, 128, 320, 512],
+                mlp_ratios=[8, 8, 4, 4],
+                norm_layer=partial(
+                    nn.LayerNorm, epsilon=1e-6),
+                depths=[3, 6, 40, 3],
+                **kwargs)
+    return model
+
+
+@manager.BACKBONES.add_component
+def VAN_B5(pretrained=False, use_ssld=False, **kwargs):
+    model = VAN(embed_dims=[96, 192, 480, 768],
+                mlp_ratios=[8, 8, 4, 4],
+                norm_layer=partial(
+                    nn.LayerNorm, epsilon=1e-6),
+                depths=[3, 3, 24, 3],
+                **kwargs)
+    return model
+
+
+@manager.BACKBONES.add_component
+def VAN_B6(pretrained=False, use_ssld=False, **kwargs):
+    model = VAN(embed_dims=[96, 192, 384, 768],
+                mlp_ratios=[8, 8, 4, 4],
+                norm_layer=partial(
+                    nn.LayerNorm, epsilon=1e-6),
+                depths=[6, 6, 90, 6],
+                **kwargs)
     return model

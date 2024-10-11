@@ -1,6 +1,7 @@
 import os.path
 from glob import glob
 from shutil import copy
+from osgeo import gdal
 
 import cv2
 import numpy as np
@@ -102,7 +103,19 @@ if __name__ == '__main__':
     #            '.tif',
     #            'D:/datasets/Cropland_Small/img_dir/train')
 
+    img_p = 'D:/datasets/Cropland_Identity/cropland_identity_datasource/bing_source/new_area_8.tif'
+    # arr = tifffile.imread(img_p)
+    data = gdal.Open(img_p)
+    arr = data.ReadAsArray()
+    arr = np.transpose(arr, (1, 2, 0))
+    cv2.imshow('ori', arr)
+    # arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
+    arr = arr[:, :, :3]
+    cv2.imshow('arr', arr)
+    cv2.waitKey()
+    print(arr)
+
     # tifconvert2rgb("D:/datasets/曹湘地块识别/曹湘地块识别/test_csx.tif")
 
-    test_label_post_process('D:/PycharmProjects/Paddle_Seg/output/compose_mscmnet_segnext/pseudo_color_prediction',
-                       'D:/PycharmProjects/Paddle_Seg/output/compose_mscmnet_segnext/post_processed_prediction_open')
+    # test_label_post_process('D:/PycharmProjects/Paddle_Seg/output/compose_mscmnet_segnext/pseudo_color_prediction',
+    #                    'D:/PycharmProjects/Paddle_Seg/output/compose_mscmnet_segnext/post_processed_prediction_open')

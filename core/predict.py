@@ -107,9 +107,12 @@ def predict(model,
     color_map = visualize.get_color_map_list(256, custom_color=custom_color)
     with paddle.no_grad():
         for i, im_path in enumerate(img_lists[local_rank]):
+
+            # 获取tif图像的坐标等信息
             data = preprocess(im_path, transforms)
 
             if aug_pred:
+                # 增强预测，结果取平均
                 pred, _ = infer.aug_inference(
                     model,
                     data['img'],
@@ -121,6 +124,7 @@ def predict(model,
                     stride=stride,
                     crop_size=crop_size)
             elif not single_model_predict:
+                # 多个模型联合预测，结果取平均
                 pred, _ = infer.multi_model_inference(
                     model,
                     data['img'],
@@ -164,14 +168,14 @@ def predict(model,
             pred_mask.save(pred_saved_path)
 
             # save added image
-            added_image = visualize.visualize(
-                im_path, pred_saved_path, color_map, weight=0.6)
-            added_image_path = os.path.join(added_saved_dir, im_file)
-            mkdir(added_image_path)
-            if os.path.splitext(added_image_path)[-1] == '.tif':
-                cv2.imencode('.tif', added_image)[1].tofile(added_image_path)
-            else:
-                cv2.imwrite(added_image_path, added_image)
+            # added_image = visualize.visualize(
+            #     im_path, pred_saved_path, color_map, weight=0.6)
+            # added_image_path = os.path.join(added_saved_dir, im_file)
+            # mkdir(added_image_path)
+            # if os.path.splitext(added_image_path)[-1] == '.tif':
+            #     cv2.imencode('.tif', added_image)[1].tofile(added_image_path)
+            # else:
+            #     cv2.imwrite(added_image_path, added_image)
 
             pred_mask = np.array(pred_mask)
             shp_path = os.path.join(pred_saved_dir, os.path.splitext(im_file)[0] + '.shp')

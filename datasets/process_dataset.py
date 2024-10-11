@@ -1,13 +1,12 @@
-import argparse
+import math
 import os.path
 from glob import glob
 from shutil import copy
-from datasets.labelme_utils import main
 
 import cv2
 import numpy as np
 import tifffile
-
+from osgeo import gdal
 
 
 def split_image(img_path, save_path):
@@ -28,7 +27,7 @@ def split_image(img_path, save_path):
     for i in range(rows):
         for j in range(cols):
             sub_num = i * (cols) + j + 1
-            img_save_path = os.path.join(str(save_path), filename + '_' + str(sub_num) + ext)
+            img_save_path = os.path.join(str(save_path), 'bing_' + filename + '_' + str(sub_num) + ext)
             if os.path.exists(img_save_path):
                 continue
             sub_arr = img_arr[i * 512: (i + 1) * 512, j * 512: (j + 1) * 512, :]
@@ -38,7 +37,7 @@ def split_image(img_path, save_path):
 def extract_area_and_label(img_save_dir, img_dir, ann_save_dir=None, ann_dir=None, crop_size=[256, 256],
                            pixel_interval=128, unlabeled=True):
     """
-    将512 x 512的图像裁剪成256 x 256，每隔pixel_interval个像素裁剪一次
+    将图像裁剪成256 x 256，每隔pixel_interval个像素裁剪一次
     """
     if not os.path.exists(img_save_dir):
         os.makedirs(img_save_dir)
@@ -72,6 +71,81 @@ def extract_area_and_label(img_save_dir, img_dir, ann_save_dir=None, ann_dir=Non
                     sub_ann = ann_arr[i * pixel_interval: i * pixel_interval + crop_size[0],
                               j * pixel_interval: j * pixel_interval + crop_size[1]]
                     cv2.imwrite(str(ann_save_path), sub_ann)
+
+
+def extract_multi_spectral_area_and_label(img_save_dir,
+                                          img_dir,
+                                          ann_save_dir,
+                                          ann_dir,
+                                          crop_size=[256, 256]):
+    """
+    将一幅较大的多光谱遥感图像切割为多个256×256的图像，每隔pixel_interval个像素开始切
+
+    :param img_save_dir:
+    :param img_dir:
+    :param ann_save_dir:
+    :param ann_dir:
+    :param crop_size:
+    """
+    if not os.path.exists(img_save_dir):
+        os.makedirs(img_save_dir)
+    if not os.path.exists(ann_save_dir):
+        os.makedirs(ann_save_dir)
+    img_paths = glob(img_dir + '/*')
+    for k in range(len(img_paths)):
+        # 获取tif图像的相关信息
+        img_path = img_paths[k]
+        img_name, img_ext = os.path.splitext(os.path.split(img_path)[-1])
+        img_data = gdal.Open(img_path)
+        in_band = img_data.GetRasterBand(1)
+        img_width, img_height = img_data.RasterXSize, img_data.RasterYSize
+        projection = img_data.GetProjection()
+        geo_trans = img_data.GetGeoTransform()
+        img_arr = img_data.ReadAsArray()
+        del img_data
+        # 读取对应标签信息，标签为png格式图像
+        ann_path = os.path.join(ann_dir, img_name + '.png')
+        if not os.path.exists(ann_path):
+            raise FileNotFoundError('annotation file not found: ' + str(ann_path))
+        ann_arr = cv2.imread(str(ann_path), cv2.IMREAD_GRAYSCALE)
+
+        channels, im_h, im_w = img_arr.shape
+        rows, cols = math.ceil(im_h / crop_size[0]), math.ceil(im_w / crop_size[1])
+
+        for i in range(rows):
+            for j in range(cols):
+                sub_num = i * (cols) + j + 1
+                img_save_path = os.path.join(str(img_save_dir), img_name + '_' + str(sub_num) + img_ext)
+                if os.path.exists(img_save_path):
+                    continue
+                end_h, end_w = (i + 1) * crop_size[0], (j + 1) * crop_size[1]
+                if i == rows - 1:
+                    end_h = img_height
+                if j == cols - 1:
+                    end_w = img_width
+                sub_arr = img_arr[:, i * crop_size[0]: end_h, j * crop_size[1]: end_w]
+
+                driver = gdal.GetDriverByName('GTiff')
+                out_ds = driver.Create(img_save_path, end_w - j * crop_size[1], end_h - i * crop_size[0], channels, in_band.DataType)
+
+                # 更新小区域的地理空间信息
+                # fixme 此处应该有错误
+                g_t = list(geo_trans)
+                g_t[0] = geo_trans[0] + i * crop_size[0]
+                g_t[3] = geo_trans[3] + j * crop_size[1]
+                out_ds.SetGeoTransform(g_t)
+                # 设置投影信息
+                out_ds.SetProjection(projection)
+                # 保存切割后的小区域tif
+                for k in range(1, channels + 1):
+                    out_ds.GetRasterBand(k).WriteArray(sub_arr[k - 1])
+                del out_ds
+                # 保存对应的标签png图像
+                ann_save_path = os.path.join(ann_save_dir, img_name + '_' + str(sub_num) + '.png')
+                if os.path.exists(ann_save_path):
+                    continue
+                sub_ann = ann_arr[i * crop_size[0]: end_h, j * crop_size[1]: end_w]
+                cv2.imwrite(str(ann_save_path), sub_ann)
 
 
 def split_dataset(root_path, test_ratio, labeled_ratio=1.0 / 16):
@@ -114,9 +188,10 @@ def extract_label(label_root, save_path):
         copy_file(p, label_save_path)
 
 
-def label_map(label_root):
+def label_map(label_root, map_dict: dict = None):
     """
-    将标签值为255的像素映射为像素值1，表示第一个类别，此处暂时只适用于二分类
+    将指定像素值映射为类别标签值，需要映射的{像素：类别}对放在map_dict中，如果没有指定，
+    则默认为二分类问题，将像素中的最大值映射为类别1，背景为0，且默认除了背景外只有该像素值
     """
     if os.path.isfile(label_root):
         label_paths = [label_root]
@@ -124,9 +199,16 @@ def label_map(label_root):
         label_paths = glob(label_root + '/*')
     for p in label_paths:
         label_arr = cv2.imread(p, cv2.IMREAD_GRAYSCALE)
-        label_value = label_arr.max()
         label_ = label_arr.copy()
-        label_arr[label_ == label_value] = 1
+        if map_dict is None:
+            # 需要一幅图像中包含所有的类别，否则错误
+            unique_item = np.unique(label_arr)
+            for k, item in enumerate(unique_item):
+                # label_value = label_arr.max()
+                label_arr[label_ == item] = k + 1
+        else:
+            for k, v in map_dict.items():
+                label_arr[label_ == k] = v
         cv2.imwrite(p, label_arr)
 
 
@@ -174,17 +256,63 @@ if __name__ == '__main__':
     # band_3 = tif_data.GetRasterBand(3)
     # x_size = tif_data.GetRasterXSize()
     # y_size = tif_data.GetRasterYSize()
+    # img_path = 'D:/datasets/湘潭晚稻影像数据/湘潭晚稻影像数据/T49RFL_20240928T030521_B02_1_stack_raster.tif'
+    # save_path = 'D:/datasets/湘潭县晚稻数据切片'
+    # data = gdal.Open(img_path)
+    # geo_trans = data.GetGeoTransform()
+    # projection = data.GetProjection()
+    # in_band = data.GetRasterBand(1)
+    # img_arr = data.ReadAsArray()
+    # channels, img_width, img_height = img_arr.shape
+    # file_path = os.path.split(img_path)[-1]
+    # filename, ext = os.path.splitext(file_path)
+    # save_path = os.path.join(save_path, filename)
+    # if not os.path.exists(save_path):
+    #     os.makedirs(save_path)
+    # cols, rows = math.ceil(img_width / 512), math.ceil(img_height / 512)
+    # for i in range(rows):
+    #     for j in range(cols):
+    #         sub_num = i * (cols) + j + 1
+    #         img_save_path = os.path.join(str(save_path), filename + '_' + str(sub_num) + ext)
+    #         if os.path.exists(img_save_path):
+    #             continue
+    #         end_h, end_w = (i + 1) * 512, (j + 1) * 512
+    #         if i == rows - 1:
+    #             # sub_arr = img_arr[:, i * 512:, j * 512: (j + 1) * 512]
+    #             end_h = img_height
+    #         if j == cols - 1:
+    #             end_w = img_width
+    #         sub_arr = img_arr[:, i * 512: end_h, j * 512: end_w]
+    #         driver = gdal.GetDriverByName('GTiff')
+    #         out_ds = driver.Create(img_save_path, end_w - j * 512, end_h - i * 512, channels, in_band.DataType)
+    #         g_t = list(geo_trans)
+    #         g_t[0] = geo_trans[0] + i * 512
+    #         g_t[3] = geo_trans[3] + j * 512
+    #         out_ds.SetProjection(data.GetProjection())
+    #         out_ds.SetGeoTransform(data.GetGeoTransform())
+    #         for k in range(1, channels + 1):
+    #             out_ds.GetRasterBand(k).WriteArray(sub_arr[k - 1])
+            # cv2.imwrite(str(img_save_path), sub_arr)
+
+    # print(arr)
 
     # ① 将大幅遥感图像切割成512 x 512的小幅图像
-    # img_path = r'D:/datasets/Cropland_Identity/cropland_identity_datasource/Cropland_Identity/new_area_16.tif'
-    # split_image(img_path, 'D:/datasets/Cropland_Identity/label_json/part3')
+
+    # img_path = r'D:/datasets/Cropland_Identity/cropland_identity_datasource/bing_source/area_17.tif'
+    # split_image(img_path, 'D:/datasets/Cropland_Identity/cropland_identity_datasource/bing_croped')
+
+    # 批量处理
+    # paths = glob('D:/datasets/Cropland_Identity/cropland_identity_datasource/bing_source')
+    # for p in paths:
+    #     # img_path = r'D:/datasets/Cropland_Identity/cropland_identity_datasource/bing_source/new_area_16.tif'
+    #     split_image(p, 'D:/datasets/Cropland_Identity/cropland_identity_datasource/bing_croped')
 
     # 划分数据集，目前不使用这种方式划分
     # split_dataset(img_path, 0.2, 1.0 / 16)
 
     # ② 将labelme标注的json形式标签转换为png标签图像，同时进行类别转换
     # parser = argparse.ArgumentParser()
-    # parser.add_argument("json_file")
+    # parser.add_argument("--json_file", default='D:/datasets/Cropland_Identity/label_json/part3/new_area_15/labels')
     # parser.add_argument("-o", "--out", default=None)
     # args = parser.parse_args()
     # if os.path.isfile(args.json_file):
@@ -196,19 +324,19 @@ if __name__ == '__main__':
     #     main(path, args)
 
     # ③ labelme转换json到png时会是一个文件夹一个图像，此处用于从文件夹中提取标签的png图像到一个指定文件夹，并对标签映射为类别标签形式
-    # json_label_path = 'D:/datasets/Cropland_Identity/label_json/part3/json_label'
-    # save_label_path = 'D:/datasets/Cropland_Identity/label_json/part3/png_label'
+    # json_label_path = 'D:/datasets/Cropland_Identity/label_json/part3/new_area_15/labels'
+    # save_label_path = 'D:/datasets/Cropland_Identity/label_json/part3/new_area_15/png_labels'
     # extract_label(json_label_path, save_label_path)
     # label_map(save_label_path)
 
     # ④ 为全部为背景的图像添加对应标签图像（如果需要使用这部分数据的话，否则跳过该步）
-    # image_path = 'D:/datasets/Cropland_Identity/label_json/part3/new_area_13'
-    # save_path = 'D:/datasets/Cropland_Identity/label_json/part3/new_area_13'
+    # image_path = 'D:/datasets/Cropland_Identity/label_json/part3/new_area_16/images'
+    # save_path = 'D:/datasets/Cropland_Identity/label_json/part3/new_area_16/png_labels'
     # add_png_label(image_path, save_path)
 
     # ④ / ⑤ 512 * 512切成 256 * 256的（在标注之后切，标签图也同步切割，无标签图像无需切标签）
-    # img_path = 'D:/datasets/Cropland_Identity/label_json/part3/images'
-    # ann_path = 'D:/datasets/Cropland_Identity/label_json/part3/png_label'
+    # img_path = 'D:/datasets/Cropland_Identity/label_json/part3/new_area_16/images'
+    # ann_path = 'D:/datasets/Cropland_Identity/label_json/part3/new_area_16/png_labels'
     # img_save_path = 'D:/datasets/Cropland_Identity/new_data/data_source/images'
     # ann_save_path = 'D:/datasets/Cropland_Identity/new_data/data_source/labels'
     # extract_area_and_label(img_save_path, img_path, ann_save_path, ann_path,

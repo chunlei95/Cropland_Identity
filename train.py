@@ -7,11 +7,15 @@ from paddleseg.utils import get_sys_env, logger
 
 from core import train
 from cvlibs.config import Config
-from datasets import CroplandDataset
-from models import ConvAttnUNet, EfficientPyramidMamba, PyramidMamba, UNetFormer, VAN, TopTransformer, TopTransformer_Base, TopTransformer_Large, VANTopFormer
+from datasets import CroplandDataset, LateRiceDataset
+from datasets.transforms import MultiSpectralCompose, MultiSpectralToTensor, MultiSpectralNormalize, MultiSpectralMinMaxScale
+from models import ConvAttnUNet, EfficientPyramidMamba, PyramidMamba, UNetFormer, VAN, VAN_B2, VAN_B3, VAN_B5, TopTransformer, \
+    TopTransformer_Base, TopTransformer_Large, VANTopFormer, TopFormerHead
 
-__all__ = ['CroplandDataset', 'ConvAttnUNet', 'EfficientPyramidMamba', 'PyramidMamba', 'UNetFormer', 'VAN', 'TopTransformer', 'TopTransformer_Base',
-           'TopTransformer_Large', 'VANTopFormer']
+__all__ = ['CroplandDataset', 'ConvAttnUNet', 'EfficientPyramidMamba', 'PyramidMamba', 'UNetFormer', 'VAN',
+           'TopTransformer', 'TopTransformer_Base', 'VAN_B2', 'VAN_B3', 'VAN_B5',
+           'TopTransformer_Large', 'VANTopFormer', 'TopFormerHead', 'LateRiceDataset',
+           'MultiSpectralNormalize', 'MultiSpectralToTensor', 'MultiSpectralMinMaxScale', 'MultiSpectralCompose']
 
 
 def parse_args():

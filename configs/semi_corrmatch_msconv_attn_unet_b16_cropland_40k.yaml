@@ -71,10 +71,10 @@ model:
     stage_out_channels: [ 96, 192, 384, 768 ]
     depths: [ 2, 2, 2, 1 ]
     local_kernel_sizes: [ 3, 3, 3, 3 ]
-    attn_kernel_sizes: [ [ 7, 13, 21 ],
-                         [ 7, 13, 21 ],
-                         [ 7, 13, 21 ],
-                         [ 7, 13, 21 ] ]
+    attn_kernel_sizes: [ [ 7, 9, 11 ],
+                         [ 7, 9, 11 ],
+                         [ 7, 9, 11 ],
+                         [ 7, 9, 11 ] ]
     dilations: [ [ 3, 3, 3 ],
                  [ 3, 3, 3 ],
                  [ 3, 3, 3 ],

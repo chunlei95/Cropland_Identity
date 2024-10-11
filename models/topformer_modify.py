@@ -486,6 +486,10 @@ class PyramidPoolAgg(nn.Layer):
             ks /= 2
             stride /= 2
             out.append(x)
+        h, w = out[0].shape[2:]
+        for i in range(1, len(out)):
+            if out[i].shape[2:] != (h, w):
+                out[i] = F.interpolate(out[i], [h, w])
         out = paddle.concat(out, axis=1)
         return out
 
@@ -602,6 +606,81 @@ SIM_BLOCK = {
     "multi_sum": InjectionMultiSum,
     "multi_sum_cbr": InjectionMultiSumCBR,
 }
+
+
+@manager.MODELS.add_component
+class TopFormerHead(nn.Layer):
+    def __init__(self,
+                 num_classes,
+                 in_channels,
+                 in_index=[0, 1, 2],
+                 in_transform='multiple_select',
+                 use_dw=False,
+                 dropout_ratio=0.1,
+                 align_corners=False):
+        super().__init__()
+
+        self.in_index = in_index
+        self.in_transform = in_transform
+        self.align_corners = align_corners
+
+        self._init_inputs(in_channels, in_index, in_transform)
+        self.linear_fuse = ConvBNAct(
+            in_channels=self.last_channels,
+            out_channels=self.last_channels,
+            kernel_size=1,
+            stride=1,
+            groups=self.last_channels if use_dw else 1,
+            act=nn.ReLU)
+        self.dropout = nn.Dropout2D(dropout_ratio)
+        self.conv_seg = nn.Conv2D(
+            self.last_channels, num_classes, kernel_size=1)
+
+    def _init_inputs(self, in_channels, in_index, in_transform):
+        assert in_transform in [None, 'resize_concat', 'multiple_select']
+        if in_transform is not None:
+            assert len(in_channels) == len(in_index)
+            if in_transform == 'resize_concat':
+                self.last_channels = sum(in_channels)
+            else:
+                self.last_channels = in_channels[0]
+        else:
+            assert isinstance(in_channels, int)
+            assert isinstance(in_index, int)
+            self.last_channels = in_channels
+
+    def _transform_inputs(self, inputs):
+        if self.in_transform == 'resize_concat':
+            inputs = [inputs[i] for i in self.in_index]
+            inputs = [
+                F.interpolate(
+                    input_data=x,
+                    size=paddle.shape(inputs[0])[2:],
+                    mode='bilinear',
+                    align_corners=self.align_corners) for x in inputs
+            ]
+            inputs = paddle.concat(inputs, axis=1)
+        elif self.in_transform == 'multiple_select':
+            inputs_tmp = [inputs[i] for i in self.in_index]
+            inputs = inputs_tmp[0]
+            for x in inputs_tmp[1:]:
+                x = F.interpolate(
+                    x,
+                    size=paddle.shape(inputs)[2:],
+                    mode='bilinear',
+                    align_corners=self.align_corners)
+                inputs += x
+        else:
+            inputs = inputs[self.in_index]
+
+        return inputs
+
+    def forward(self, x):
+        x = self._transform_inputs(x)
+        x = self.linear_fuse(x)
+        x = self.dropout(x)
+        x = self.conv_seg(x)
+        return x
 
 
 @manager.BACKBONES.add_component
@@ -838,7 +917,8 @@ class VANTopFormer(nn.Layer):
     def __init__(self,
                  backbone,
                  head,
-                 align_corners):
+                 align_corners,
+                 num_classes):
         super().__init__()
         self.backbone = backbone
         self.decode_head = head
